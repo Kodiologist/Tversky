@@ -81,29 +81,43 @@ sub new
         map {$_ => $cgi->param($_)} $cgi->param};
 
     my %s = $o->getrow('subjects', ip => $ip);
+    $s{double_dip} and $o->double_dipped;
+    $s{completed_t} and $o->completion_page;
     $o->{sn} = $s{sn}; # Which may not exist yet.
 
     unless (%s)
-      # We have no existing record of this person.
+      # We have no existing record for this IP address.
        {if ($o->{mturk} and not exists $p{workerId})
          # The worker is previewing this HIT.
            {$o->{preview}->();
             $o->quit;}
-        # In MTurk, the worker just accepted the HIT. Otherwise,
-        # we're seeing this IP address for the first time. Either
-        # way, make a new row in the subjects table for this
+        if ($o->{mturk})
+          # The worker just accepted the HIT. Try to keep the
+          # same worker from doing this task twice.
+           {my %mturk = $o->getrow('mturk', workerid => $p{workerId});
+            if (defined $mturk{sn})
+               {$o->insert('subjects',
+                    ip => $ip,
+                    double_dip => 1,
+                    first_seen_t => time);
+                $o->double_dipped;}}
+        # We seem to have a new subject. (If we're not using
+        # MTurk, we're seeing this IP address for the first
+        # time.) Make a new row in the subjects table for this
         # person.
-        $o->insert('subjects',
-            ip => $ip,
-            first_seen_t => time);
-        %s = $o->getrow('subjects', ip => $ip);
-        $o->{sn} = $s{sn};
-        $o->{mturk} and
-            $o->insert('mturk',
-                sn => $o->{sn},
-                workerid => $p{workerId},
-                hitid => $p{hitId},
-                assignmentid => $p{assignmentId});}
+        $o->transaction(sub
+           {$o->insert('subjects',
+                ip => $ip,
+                double_dip => 0,
+                first_seen_t => time);
+            %s = $o->getrow('subjects', ip => $ip);
+            $o->{sn} = $s{sn};
+            $o->{mturk} and
+                $o->insert('mturk',
+                    sn => $o->{sn},
+                    workerid => $p{workerId},
+                    hitid => $p{hitId},
+                    assignmentid => $p{assignmentId})});}
 
     unless ($s{consented_t})
        {if ($p{consent_statement} and
@@ -265,6 +279,11 @@ sub transaction
         die;}
     else
        {$self->{db}->commit;}}
+
+sub double_dipped
+   {my $self = shift;
+    print "<p>It looks like you already participated in this study as another HIT. Please return this HIT.</p>";
+    $self->quit;}
 
 sub page
    {my $self = shift;
