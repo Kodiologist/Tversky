@@ -33,6 +33,17 @@ sub chomped
     chomp $x;
     $x;}
 
+sub in
+   {my $item = shift;
+    $item eq $_ and return $_ foreach @_;
+    undef;}
+
+sub map2 (&@)
+   {my $f = shift;
+    map
+        {$f->(@_[2*$_, 2*$_ + 1])}
+        0 .. (int(@_/2) - 1);}
+
 # --------------------------------------------------
 # Public methods
 # --------------------------------------------------
@@ -204,6 +215,23 @@ sub yesno_page
             proc => sub 
                {$_ eq 'yes' ? 1 : $_ eq 'no' ? 0 : undef;}}]);}
 
+sub multiple_choice_page
+   {my ($self, $key, $content, @choices) = @_;
+    $self->page(key => $key,
+        content => $content,
+        fields => [{name => 'multiple_choice',
+            k => $key,
+            html =>  sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
+                map2
+                   {my ($label, $body) = @_;
+                    sprintf '<div class="row">%s%s</div>',
+                        sprintf('<div class="button"><button name="multiple_choice" value="%s" type="submit">%s</button></div>',
+                            htmlsafe($label), htmlsafe($label)),
+                        "<div class='body'>$body</div>"}
+                @choices),
+            proc => sub
+               {in $_, map2 {$_[0]} @choices}}]);}
+
 sub completion_page
    {my $self = shift;
     $self->modify('subjects',
@@ -317,7 +345,7 @@ sub page
     # Show the task.
     print "<div class='expbody'>$h{content}</div>";
     print $self->form(
-        sprintf('<input type="hidden" name="key" value="%s">',
+        sprintf('<div><input type="hidden" name="key" value="%s"></div>',
             htmlsafe($key)),
         (map {$_->{html}} @{$h{fields}}));
     $self->quit;}
