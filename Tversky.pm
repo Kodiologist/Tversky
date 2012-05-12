@@ -329,35 +329,41 @@ sub page
     my %h = (key => undef, content => undef, fields => [], @_);
     my $key = $h{key};
 
-    # If the subject has already done this part of the task, skip it.
-    $self->begin($key) or return;
+    if (defined $key)
+    # An undefined $key means that this form is just for show
+    # (particularly, MTurk previews) and doesn't need to interact
+    # with the database.
+       {# If the subject has already done this part of the task, skip it.
+        $self->begin($key) or return;
 
-    # If the subject has just sent a reply, validate it. If it
-    # all looks good, record it and move on; otherwise, repeat
-    # the task.
-    VALIDATE: {
-    if (exists $self->{params}{key} and
-            $self->{params}{key} eq htmlsafe($key))
-       {my %to_save;
-        foreach my $f (@{$h{fields}})
-           {exists $self->{params}{$f->{name}} or last VALIDATE;
-            local $_ = $self->{params}{$f->{name}};
-            my $v = $f->{proc}->();
-            defined $v or last VALIDATE;
-            exists $f->{k} and $to_save{$f->{k}} = $v;}
-        $self->transaction(sub
-           {$self->save($_, $to_save{$_}) foreach keys %to_save;
-            $self->now_done($key);});
-        # Clear $self->{params} so responses to this task aren't
-        # mistaken for responses to another task.
-        $self->{params} = {};
-        return;}}
+        # If the subject has just sent a reply, validate it. If it
+        # all looks good, record it and move on; otherwise, repeat
+        # the task.
+        VALIDATE: {
+        if (exists $self->{params}{key} and
+                $self->{params}{key} eq htmlsafe($key))
+           {my %to_save;
+            foreach my $f (@{$h{fields}})
+               {exists $self->{params}{$f->{name}} or last VALIDATE;
+                local $_ = $self->{params}{$f->{name}};
+                my $v = $f->{proc}->();
+                defined $v or last VALIDATE;
+                exists $f->{k} and $to_save{$f->{k}} = $v;}
+            $self->transaction(sub
+               {$self->save($_, $to_save{$_}) foreach keys %to_save;
+                $self->now_done($key);});
+            # Clear $self->{params} so responses to this task aren't
+            # mistaken for responses to another task.
+            $self->{params} = {};
+            return;}}}
 
     # Show the task.
     print "<div class='expbody'>$h{content}</div>";
     print $self->form(
-        sprintf('<div><input type="hidden" name="key" value="%s"></div>',
-            htmlsafe($key)),
+        (defined $key
+           ? sprintf('<div><input type="hidden" name="key" value="%s"></div>',
+                htmlsafe($key))
+           : ()),
         (map {$_->{html}} @{$h{fields}}));
     $self->quit;}
 
