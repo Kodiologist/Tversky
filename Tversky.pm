@@ -3,7 +3,7 @@ package Tversky;
 use strict;
 
 use parent 'Exporter';
-our @EXPORT_OK = 'htmlsafe';
+our @EXPORT_OK = qw(htmlsafe randelm shuffle);
 
 use DBIx::Simple;
 use SQL::Abstract;
@@ -21,10 +21,6 @@ my $mturk_production_submit_url = 'https://www.mturk.com/mturk/externalSubmit';
 sub htmlsafe
    {encode_entities $_[0], q(<>&"')}
 
-# --------------------------------------------------
-# Private subroutines
-# --------------------------------------------------
-
 sub randelm
    {$_[ int(rand() * @_) ]}
 
@@ -34,6 +30,10 @@ sub shuffle
        {my $k = int rand $n + 1;
         $k == $n or @a[$k, $n] = @a[$n, $k];}
     return @a;}
+
+# --------------------------------------------------
+# Private subroutines
+# --------------------------------------------------
 
 sub chomped
    {my $x = shift;
@@ -232,7 +232,7 @@ sub multiple_choice_page
         content => $content,
         fields => [{name => 'multiple_choice',
             k => $key,
-            html =>  sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
+            html => sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
                 map2
                    {my ($label, $body) = @_;
                     sprintf '<div class="row">%s%s</div>',
