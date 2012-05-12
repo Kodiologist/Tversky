@@ -107,7 +107,7 @@ sub new
       # We have no existing record for this IP address.
        {if ($o->{mturk} and not exists $p{workerId})
          # The worker is previewing this HIT.
-           {$o->{preview}->();
+           {$o->{preview}->($o);
             $o->quit;}
         if ($o->{mturk})
           # The worker just accepted the HIT. Try to keep the
