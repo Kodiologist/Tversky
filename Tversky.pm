@@ -28,6 +28,13 @@ sub htmlsafe
 sub randelm
    {$_[ int(rand() * @_) ]}
 
+sub shuffle
+   {my @a = @_;
+    foreach my $n (1 .. $#a)
+       {my $k = int rand $n + 1;
+        $k == $n or @a[$k, $n] = @a[$n, $k];}
+    return @a;}
+
 sub chomped
    {my $x = shift;
     chomp $x;
@@ -173,6 +180,10 @@ sub getu
 sub randomly_assign
    {my ($self, $key, @vals) = @_;
     $self->save($key, randelm @vals);}
+
+sub assign_permutation
+   {my ($self, $key, $separator, @vals) = @_;
+    $self->save($key, join $separator, shuffle @vals);}
 
 sub okay_page
    {my ($self, $key, $content) = @_;
