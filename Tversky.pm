@@ -325,7 +325,7 @@ sub transaction
 
 sub double_dipped
    {my $self = shift;
-    print "<p>It looks like you already participated in this study as another HIT. Please return this HIT.</p>";
+    print "<p>It looks like you participated in another study that makes you ineligible for this one (perhaps the same study as a different HIT). Please return this HIT.</p>";
     $self->quit;}
 
 sub page
