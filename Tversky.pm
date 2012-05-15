@@ -199,13 +199,17 @@ sub discrete_rating_page
         content => $content,
         fields => [{name => 'discrete_scale',
             k => $key,
-            html => join('',
-              '<p>', htmlsafe($anchor_lo),
-              (map
-                 {"<button class='discrete_scale_button' name='discrete_scale' value='$_' type='submit'></button>"}
-                 1 .. $scale_points),
-              htmlsafe($anchor_hi),'</p>'),
-            #html => '<input type="text" name="discrete_scale"/>',
+            html => sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
+                map
+                   {sprintf '<div class="row">%s%s</div>',
+                        "<button class='discrete_scale_button' name='discrete_scale' value='$_' type='submit'></button>",
+                        sprintf '<div class="body">%s</div>',
+                            $_ == 1
+                          ? htmlsafe($anchor_lo)
+                          : $_ == $scale_points
+                          ? htmlsafe($anchor_hi)
+                          : ''}
+                reverse 1 .. $scale_points),
             proc => sub 
                {/\A(\d+)\z/ or return undef;
                 return $1 >= 1 && $1 <= $scale_points
