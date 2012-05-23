@@ -193,6 +193,21 @@ sub okay_page
             html => '<p><button class="next_button" name="next_button" value="next" type="submit">Next</button></p>',
             proc => sub { $_ eq 'next' or undef }}]);}
 
+sub text_entry_page
+   {my ($self, $key, $content, $multiline, $max_chars) = @_;
+    $self->page(key => $key,
+        content => $content,
+        fields => [
+           {name => 'text_entry',
+                k => $key,
+                html => sprintf('<p>%s</p>', $multiline
+                  ? '<textarea class="text_entry" name="text_entry"></textarea>'
+                  : '<input type="text" name="text_entry">'),
+                proc => sub { substr $_, 0, $max_chars }},
+           {name => 'text_entry_submit_button',
+                html => '<p><button class="next_button" name="text_entry_submit_button" value="submit" type="submit">OK</button></p>',
+                proc => sub { $_ eq 'submit' or undef }}]);}
+
 sub discrete_rating_page
    {my ($self, $key, $content, $scale_points, $anchor_lo, $anchor_hi) = @_;
     $self->page(key => $key,
@@ -246,6 +261,10 @@ sub multiple_choice_page
                 @choices),
             proc => sub
                {in $_, map2 {$_[0]} @choices}}]);}
+
+sub buttons_page
+   {my ($self, $key, $content, @buttons) = @_;
+    $self->multiple_choice_page($key, $content, map {$_, ''} @buttons);}
 
 sub completion_page
    {my $self = shift;
