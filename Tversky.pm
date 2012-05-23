@@ -239,11 +239,11 @@ sub yesno_page
             k => $key,
             html =>
                 '<p>' .
-                '<button name="yesno" value="yes" type="submit">Yes</button>' .
-                '<button name="yesno" value="no" type="submit">No</button>' .
+                '<button name="yesno" value="Yes" type="submit">Yes</button>' .
+                '<button name="yesno" value="No" type="submit">No</button>' .
                 '</p>',
             proc => sub 
-               {$_ eq 'yes' ? 1 : $_ eq 'no' ? 0 : undef;}}]);}
+               {$_ eq 'Yes' || $_ eq 'No' ? $_ : undef;}}]);}
 
 sub multiple_choice_page
    {my ($self, $key, $content, @choices) = @_;
