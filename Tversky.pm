@@ -194,16 +194,21 @@ sub okay_page
             proc => sub { $_ eq 'next' or undef }}]);}
 
 sub text_entry_page
-   {my ($self, $key, $content, $multiline, $max_chars) = @_;
+   {my ($self, $key, $content) = splice @_, 0, 3;
+    my %options =
+       (multiline => 0, max_chars => 256, accept_blank => 0,
+        @_);
     $self->page(key => $key,
         content => $content,
-        fields => [
-           {name => 'text_entry',
+        fields =>
+          [{name => 'text_entry',
                 k => $key,
-                html => sprintf('<p>%s</p>', $multiline
+                html => sprintf('<p>%s</p>', $options{multiline}
                   ? '<textarea class="text_entry" name="text_entry"></textarea>'
                   : '<input type="text" name="text_entry">'),
-                proc => sub { substr $_, 0, $max_chars }},
+                proc => sub
+                   {$options{accept_blank} or /\S/ or return undef;
+                    substr $_, 0, $options{max_chars};}},
            {name => 'text_entry_submit_button',
                 html => '<p><button class="next_button" name="text_entry_submit_button" value="submit" type="submit">OK</button></p>',
                 proc => sub { $_ eq 'submit' or undef }}]);}
