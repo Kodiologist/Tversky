@@ -214,7 +214,21 @@ sub text_entry_page
                 proc => sub { $_ eq 'submit' or undef }}]);}
 
 sub discrete_rating_page
-   {my ($self, $key, $content, $scale_points, $anchor_lo, $anchor_hi) = @_;
+   {my ($self, $key, $content) = splice @_, 0, 3;
+    my %options =
+       (scale_points => 7, anchors => undef, @_);
+
+    my ($anchor_lo, $anchor_mid, $anchor_hi);
+    if (defined $options{anchors})
+       {if (@{$options{anchors}} == 2)
+           {($anchor_lo, $anchor_hi) = @{$options{anchors}};}
+        elsif (@{$options{anchors}} == 3)
+           {$options{scale_points} % 2 == 0
+                and die "middle anchor supplied but scale_points ($options{scale_points}) is even";
+            ($anchor_lo, $anchor_mid, $anchor_hi) = @{$options{anchors}};}
+        else
+           {die "anchors must have 2 or 3 elements";}}
+
     $self->page(key => $key,
         content => $content,
         fields => [{name => 'discrete_scale',
@@ -224,15 +238,17 @@ sub discrete_rating_page
                    {sprintf '<div class="row">%s%s</div>',
                         "<button class='discrete_scale_button' name='discrete_scale' value='$_' type='submit'></button>",
                         sprintf '<div class="body">%s</div>',
-                            $_ == 1
+                            $_ == 1 && defined $anchor_lo
                           ? htmlsafe($anchor_lo)
-                          : $_ == $scale_points
+                          : $_ == $options{scale_points} && defined $anchor_hi
                           ? htmlsafe($anchor_hi)
+                          : $_ == (1 + $options{scale_points})/2 && defined $anchor_mid
+                          ? htmlsafe($anchor_mid)
                           : ''}
-                reverse 1 .. $scale_points),
+                reverse 1 .. $options{scale_points}),
             proc => sub 
                {/\A(\d+)\z/ or return undef;
-                return $1 >= 1 && $1 <= $scale_points
+                return $1 >= 1 && $1 <= $options{scale_points}
                   ? $1
                   : undef;}}]);}
 
