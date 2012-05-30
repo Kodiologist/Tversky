@@ -59,6 +59,7 @@ sub new
    {my $invocant = shift;
     my %h =
         (mturk => undef,
+         assume_consent => 0, # Turn it on for testing.
          here_url => undef,
 
          database_path => undef,
@@ -138,13 +139,16 @@ sub new
                     assignmentid => $p{assignmentId})});}
 
     unless ($s{consented_t})
-       {if ($p{consent_statement} and
+       {if ($h{assume_consent} or
+            $p{consent_statement} and
             $p{consent_statement} =~ $o->{consent_regex})
           # The subject just consented. Log the time and task
           # version and set up the experiment.
            {$o->transaction(sub
                {$o->modify('subjects', {sn => $o->{sn}},
-                   {consented_t => time,
+                   {consented_t => $h{assume_consent}
+                      ? 'assumed'
+                      : time,
                     task_version => $o->{task_version}});
                 $o->{after_consent_prep}->($o);});}
         else
