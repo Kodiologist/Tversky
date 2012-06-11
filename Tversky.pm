@@ -3,7 +3,7 @@ package Tversky;
 use strict;
 
 use parent 'Exporter';
-our @EXPORT_OK = qw(htmlsafe randelm shuffle);
+our @EXPORT_OK = qw(cat htmlsafe randelm shuffle);
 
 use DBIx::Simple;
 use SQL::Abstract;
@@ -18,7 +18,10 @@ my $mturk_production_submit_url = 'https://www.mturk.com/mturk/externalSubmit';
 # Public subroutines
 # --------------------------------------------------
 
-sub htmlsafe
+sub cat
+   {join '', @_}
+
+sub htmlsafe ($)
    {encode_entities $_[0], q(<>&"')}
 
 sub randelm
@@ -45,6 +48,12 @@ sub map2 (&@)
     map
         {$f->(@_[2*$_, 2*$_ + 1])}
         0 .. (int(@_/2) - 1);}
+
+sub image_button_page_proc
+   {/\A(\d+)\z/ or return undef;
+    my $n = $1;
+    $n =~ s/\A0+//;
+    $n eq '' ? 0 : $n}
 
 # --------------------------------------------------
 # Public methods
@@ -184,6 +193,29 @@ sub assign_permutation
    {my ($self, $key, $separator, @vals) = @_;
     $self->save($key, join $separator, shuffle @vals);}
 
+sub image_button
+   {my $self = shift;
+    my %options =
+       (image_url => undef, alt => undef, anchors => undef,
+        example => 0, @_);
+    defined $options{anchors} and @{$options{anchors}} != 2 and
+         die 'anchors must have exactly 2 elements';
+    return sprintf '<div class="image_button">%s%s%s</div>',
+        $options{anchors}
+          ? sprintf('<div class="anchor">%s</div>',
+                htmlsafe $options{anchors}[0])
+          : '',
+        sprintf('<%s src="%s" alt="%s">',
+            $options{example}
+              ? 'img'
+              : 'input type="image" name="image_button"',
+            htmlsafe($options{image_url}),
+            htmlsafe($options{alt})),
+        $options{anchors}
+          ? sprintf('<div class="anchor">%s</div>',
+                htmlsafe $options{anchors}[1])
+          : '';}
+
 sub okay_page
    {my ($self, $key, $content) = @_;
     $self->page(key => $key,
@@ -285,6 +317,20 @@ sub multiple_choice_page
 sub buttons_page
    {my ($self, $key, $content, @buttons) = @_;
     $self->multiple_choice_page($key, $content, map {$_, ''} @buttons);}
+
+sub image_button_page
+   {my ($self, $key, $content, %options) = @_;
+    $self->page(key => $key,
+        content => $content,
+        fields =>
+           [{name => 'image_button.x',
+                k => "$key.x",
+                html => $self->image_button(%options),
+                proc => \&image_button_page_proc},
+            {name => 'image_button.y',
+                k => "$key.y",
+                html => '',
+                proc => \&image_button_page_proc}]);}
 
 sub completion_page
    {my $self = shift;
@@ -403,11 +449,11 @@ sub page
     # Show the task.
     print "<div class='expbody'>$h{content}</div>";
     print $self->form(
-        (defined $key
-           ? sprintf('<div><input type="hidden" name="key" value="%s"></div>',
-                htmlsafe($key))
-           : ()),
-        (map {$_->{html}} @{$h{fields}}));
+        defined $key
+          ? sprintf('<div><input type="hidden" name="key" value="%s"></div>',
+                htmlsafe $key)
+          : (),
+        map {$_->{html}} @{$h{fields}});
     $self->quit;}
 
 sub form
