@@ -35,11 +35,6 @@ sub shuffle
 # Private subroutines
 # --------------------------------------------------
 
-sub chomped
-   {my $x = shift;
-    chomp $x;
-    $x;}
-
 sub in
    {my $item = shift;
     $item eq $_ and return $_ foreach @_;
