@@ -72,6 +72,8 @@ sub new
          consent_path => undef,
          consent_regex => qr/\A \s* ['"]? \s* i \s+ consent \s* ['"]? \s* \z/xi,
 
+         mturk_prompt_new_window => 0,
+
          experiment_complete => '<p>The experiment is complete. Thanks for your help!</p>',
 
          task_version => undef,
@@ -143,18 +145,20 @@ sub new
                     assignmentid => $p{assignmentId})});}
 
     unless ($s{consented_t})
-       {if ($h{assume_consent} or
+       {if ($o->{assume_consent} or
             $p{consent_statement} and
             $p{consent_statement} =~ $o->{consent_regex})
           # The subject just consented. Log the time and task
           # version and set up the experiment.
            {$o->transaction(sub
                {$o->modify('subjects', {sn => $o->{sn}},
-                   {consented_t => $h{assume_consent}
+                   {consented_t => $o->{assume_consent}
                       ? 'assumed'
                       : time,
                     task_version => $o->{task_version}});
-                $o->{after_consent_prep}->($o);});}
+                $o->{after_consent_prep}->($o);});
+            if ($o->{mturk} and $o->{mturk_prompt_new_window})
+               {$o->prompt_new_window_page;}}
         else
           # The subject hasn't consented, so show the consent form.
            {print slurp($o->{consent_path});
@@ -163,6 +167,12 @@ sub new
                 '<input type="text" class="consent_statement" name="consent_statement" value="">',
                 '<button type="submit" name="consent_button" value="submitted">OK</button>');
             $o->quit;}}
+
+    if ($o->{mturk} and $o->{mturk_prompt_new_window}
+            and exists $p{workerId})
+      # The subject probably just re-navigated to the task through
+      # MTurk.
+       {$o->prompt_new_window_page;}
 
     $o->{params} = \%p;
     $o->{user} = {map
@@ -215,6 +225,27 @@ sub image_button
           ? sprintf('<div class="anchor">%s</div>',
                 htmlsafe $options{anchors}[1])
           : '';}
+
+sub prompt_new_window_page
+   {my $self = shift;
+    print
+      q!<script type="text/javascript">
+        // From https://developer.mozilla.org/en/DOM/window.open#Best_practices
+        var win = null;
+        function new_win(url)
+           {if (win == null || win.closed)
+                win = window.open(url,
+                    "mywin", "resizable=yes,scrollbars=yes,status=yes");
+            else
+                win.focus();};
+        </script>!;
+    printf '<p><a href="%s" %s %s>%s</a> %s</p>',
+        htmlsafe $self->{here_url},
+        'onclick="new_win(this.href); return false"',
+        'onkeydown="new_win(this.href); return false"',
+        'This HIT is best viewed in its own window or tab.',
+        q{You may get a blank page when you submit the HIT, but don't be alarmed: it should still have gone through.};
+    $self->quit;}
 
 sub okay_page
    {my ($self, $key, $content) = @_;
