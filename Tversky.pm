@@ -193,6 +193,8 @@ sub save
 
 sub getu
    {my ($self, $key) = @_;
+    exists $self->{user}{$key}
+        or die "getu on unset key: $key";
     $self->{user}{$key};}
 
 sub randomly_assign
