@@ -409,6 +409,25 @@ sub completion_page
                 '<button name="submit_hit_button" value="submitted" type="submit">Submit HIT</button>';}
     $self->quit;}
 
+sub loop
+   {my ($self, $key, $f) = @_;
+    $self->existsu($key)
+        or $self->save($key, 0);
+    $_ = $self->getu($key);
+    /\ALAST / and return;
+    foreach my $UNUSED (1, 2)
+       {eval {$f->()};
+        if ($@)
+           {if ($@ eq "LAST\n")
+              {$self->save($key, "LAST $_");
+               return;}
+            die;}
+        $self->save($key, ++$_);}
+    die 'loop attempted to run more than twice for one request';}
+
+sub last
+   {die "LAST\n";}
+
 # --------------------------------------------------
 # Private methods
 # --------------------------------------------------
