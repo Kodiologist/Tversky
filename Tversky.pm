@@ -260,22 +260,45 @@ sub okay_page
 sub text_entry_page
    {my ($self, $key, $content) = splice @_, 0, 3;
     my %options =
-       (multiline => 0, max_chars => 256, accept_blank => 0,
+       (multiline => 0, max_chars => 256,
+        trim => 1, accept_blank => 0,
+        hint => undef, proc => undef,
         @_);
+    # Note: hint, if provided, should be raw HTML, not
+    # plain text.
     $self->page(key => $key,
         content => $content,
         fields =>
           [{name => 'text_entry',
                 k => $key,
-                html => sprintf('<p>%s</p>', $options{multiline}
-                  ? '<textarea class="text_entry" name="text_entry"></textarea>'
-                  : '<input type="text" name="text_entry">'),
+                html => sprintf('<div class="text_entry">%s%s</div>',
+                  $options{multiline}
+                    ? '<textarea class="text_entry" name="text_entry"></textarea>'
+                    : '<input type="text" class="text_entry" name="text_entry">',
+                  defined $options{hint}
+                    ? sprintf '<div class="hint">%s</div>', $options{hint}
+                    : ''),
                 proc => sub
-                   {$options{accept_blank} or /\S/ or return undef;
+                   {if ($options{trim})
+                       {s/\A\s+//;
+                        s/\s+\z//;}
+                    $options{accept_blank} or /\S/ or return;
+                    if ($options{proc})
+                       {$_ = $options{proc}->();
+                        defined or return;}
                     substr $_, 0, $options{max_chars};}},
            {name => 'text_entry_submit_button',
                 html => '<p><button class="next_button" name="text_entry_submit_button" value="submit" type="submit">OK</button></p>',
                 proc => sub { $_ eq 'submit' or undef }}]);}
+
+sub dollars_entry_page
+   {my ($self, $key, $content) = @_;
+    $self->text_entry_page($key, $content,
+        hint => 'Enter a dollar amount. Cents are allowed.',
+        proc => sub
+           {/\A (?: \$ \s*)? (\d+ (?: \.\d\d?)? | \.\d\d? ) (?: \s* \$)? \z/x
+              ? $1
+              : undef});}
 
 sub discrete_rating_page
    {my ($self, $key, $content) = splice @_, 0, 3;
