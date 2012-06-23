@@ -85,6 +85,21 @@ sub new
          @_);
     bless \%h, ref($invocant) || $invocant;}
 
+sub run
+   {my ($self, $f) = @_;
+    local $@;
+    eval
+       {$self->init;
+        $f->();
+        $self->completion_page;};
+    $self->ensure_header;
+    defined $@ or $@ = 'Exited "run" with undefined $@';
+    $@ eq '' and $@ = 'Exited "run" with $@ set to the null string';
+    warn $@;
+    printf '<p>Error:</p><pre>%s</pre><p>Please report this.</p>',
+        htmlsafe $@;
+    $self->quit;}
+
 sub init
    {my $o = shift;
 
@@ -203,7 +218,7 @@ sub ensure_header
         $self->{head},
         "</head>\n",
         "\n",
-        "<body>\n";
+        "<body>\n\n\n";
     $self->{printed_header} = 1;}
 
 sub save
