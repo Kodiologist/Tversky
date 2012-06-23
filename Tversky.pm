@@ -79,18 +79,23 @@ sub new
          task_version => undef,
          preview => sub { print '<p>(No preview available.)</p>' },
          after_consent_prep => sub {},
+
+         head => '<title>Study</title>',
          footer => "</body></html>\n",
          @_);
-    defined $h{tables}{$_} or die "No table supplied for '$_'"
+    bless \%h, ref($invocant) || $invocant;}
+
+sub init
+   {my $o = shift;
+
+    defined $o->{tables}{$_} or die "No table supplied for '$_'"
         foreach qw(subjects timing user);
-    if ($h{mturk})
-       {$h{mturk} eq 'sandbox' or $h{mturk} eq 'production'
-            or die "Illegal value for 'mturk': $h{mturk}";
-        defined $h{tables}{'mturk'} or die "No table supplied for 'mturk'";}
+    if ($o->{mturk})
+       {$o->{mturk} eq 'sandbox' or $o->{mturk} eq 'production'
+            or die "Illegal value for 'mturk': $o->{mturk}";
+        defined $o->{tables}{'mturk'} or die "No table supplied for 'mturk'";}
 
-    my $o = bless \%h, ref($invocant) || $invocant;
-
-    $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$h{database_path}")
+    $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}")
         or die DBIx::Simple->error;
     $o->{db}->abstract = new SQL::Abstract;
     $o->{db}->{sqlite_unicode} = 1;
@@ -183,7 +188,23 @@ sub new
            {first_sent => $_->{first_sent},
             received => $_->{received}}}
         $o->getrows('timing', sn => $o->{sn})};
-    return $o;}
+    $o->ensure_header;}
+
+sub ensure_header
+   {my $self = shift;
+    $self->{printed_header} and return;
+    print
+        "Content-Type: text/html; charset=utf-8\n",
+        "\n",
+        qq{<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"\n},
+        qq{    "http://www.w3.org/TR/html4/strict.dtd">\n},
+        qq{<html lang="en">\n},
+        "<head>\n",
+        $self->{head},
+        "</head>\n",
+        "\n",
+        "<body>\n";
+    $self->{printed_header} = 1;}
 
 sub save
    {my ($self, $key, $value) = @_;
@@ -428,6 +449,11 @@ sub loop
 sub last
    {die "LAST\n";}
 
+sub quit
+   {my $self = shift;
+    print $self->{footer};
+    exit;}
+
 # --------------------------------------------------
 # Private methods
 # --------------------------------------------------
@@ -557,8 +583,3 @@ sub now_done
     $self->modify('timing',
         {sn => $self->{sn}, k => $key},
         {received => $self->{timing}{$key}{received}});}
-
-sub quit
-   {my $self = shift;
-    print $self->{footer};
-    exit;}
