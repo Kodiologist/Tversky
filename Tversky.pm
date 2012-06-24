@@ -233,6 +233,10 @@ sub getu
         or die "getu on unset key: $key";
     $self->{user}{$key};}
 
+sub existsu
+   {my ($self, $key) = @_;
+    exists $self->{user}{$key};}
+
 sub randomly_assign
    {my ($self, $key, @vals) = @_;
     $self->save($key, randelm @vals);}
