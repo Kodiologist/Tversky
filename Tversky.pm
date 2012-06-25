@@ -8,9 +8,12 @@ our @EXPORT_OK = qw(cat htmlsafe randelm shuffle);
 use DBIx::Simple;
 use SQL::Abstract;
 use CGI::Minimal;
+use CGI::Cookie;
 use HTML::Entities 'encode_entities';
 use File::Slurp 'slurp';
 
+my $rand_base64_str_bytes = 6;
+  # 6 bytes encode to 8 characters of Base64.
 my $mturk_sandbox_submit_url = 'https://workersandbox.mturk.com/mturk/externalSubmit';
 my $mturk_production_submit_url = 'https://www.mturk.com/mturk/externalSubmit';
 
@@ -23,6 +26,15 @@ sub cat
 
 sub htmlsafe ($)
    {encode_entities $_[0], q(<>&"')}
+
+my $urandom_fh;
+sub rand_base64_str ()
+   {defined $urandom_fh
+        or open $urandom_fh, '<:raw', '/dev/urandom';
+    my $buffer;
+    read $urandom_fh, $buffer, $rand_base64_str_bytes;
+    require MIME::Base64;
+    MIME::Base64::encode_base64($buffer, '');}
 
 sub randelm
    {$_[ int(rand() * @_) ]}
@@ -65,6 +77,7 @@ sub new
         (mturk => undef,
          assume_consent => 0, # Turn it on for testing.
          here_url => undef,
+         cookie_lifespan => 12*60*60, # 12 hours
 
          database_path => undef,
          tables => {},
@@ -117,52 +130,71 @@ sub init
     $o->{db}->{sqlite_see_if_its_a_number} = 1;
     $o->sql('pragma foreign_keys = on');
 
-    my $ip = $ENV{REMOTE_ADDR} =~ /(\d+) \. (\d+) \. (\d+) \. (\d+)/x
-      ? "$1.$2.$3.$4"
-      : die 'badip';
-
     my %p = do 
        {my $cgi = new CGI::Minimal;
         map {$_ => $cgi->param($_)} $cgi->param};
 
-    my %s = $o->getrow('subjects', ip => $ip);
-    $s{double_dip} and $o->double_dipped;
-    $s{completed_t} and $o->completion_page;
-    $o->{sn} = $s{sn}; # Which may not exist yet.
-
-    unless (%s)
-      # We have no existing record for this IP address.
-       {if ($o->{mturk} and not exists $p{workerId})
-         # The worker is previewing this HIT.
+    my $cookie;
+       {my %h = CGI::Cookie->fetch;
+        %h and $cookie = $h{Tversky_ID};}
+    my %s;
+    defined $cookie
+        and %s = $o->getrow('subjects', cookie_id => $cookie->value);
+    unless (defined $cookie
+            and %s and time <= $s{cookie_expires_t}
+            and !($o->{mturk}
+                and $ENV{REQUEST_METHOD} eq 'GET'
+                and exists $p{workerId}
+                and $p{workerId} ne $o->getitem('mturk', 'workerid', sn => $s{sn})))
+       {if ($o->{mturk} and !exists $p{workerId} || !exists $p{assignmentId} || !exists $p{hitId})
+          # The worker is previewing this HIT. Or at any rate,
+          # they haven't shown us a good cookie but nor have they
+          # provided all three of the MTurk parameters, so we might
+          # as well just show a preview.
            {$o->{preview}->($o);
             $o->quit;}
-        if ($o->{mturk})
-          # The worker just accepted the HIT. Try to keep the
-          # same worker from doing this task twice.
-           {my %mturk = $o->getrow('mturk', workerid => $p{workerId});
-            if (defined $mturk{sn})
-               {$o->insert('subjects',
-                    ip => $ip,
-                    double_dip => 1,
-                    first_seen_t => time);
-                $o->double_dipped;}}
-        # We seem to have a new subject. (If we're not using
-        # MTurk, we're seeing this IP address for the first
-        # time.) Make a new row in the subjects table for this
-        # person.
+        my $cid;
+        do {$cid = rand_base64_str}
+            while $o->count('subjects', cookie_id => $cid);
+        my $cookie_expires_t = time + $o->{cookie_lifespan};
+        $cookie = new CGI::Cookie
+           (-name => 'Tversky_ID',
+            -value => $cid,
+            -expires => "+$o->{cookie_lifespan}s",
+              # May differ slightly from $cookie_expires_t, yeah,
+              # yeah, who cares.
+            -secure => 1,
+            -httponly => 1);
+        $o->{set_cookie} = $cookie->as_string;
+        $o->ensure_header;
+        my $double_dipped = $o->{mturk} && $o->count('mturk',
+            workerid => $p{workerId},
+            -bool => 'reconciled');
+          # The worker that this user is claiming to be has already
+          # done this task (or has been included in the MTurk table
+          # to keep them out of it).
         $o->transaction(sub
            {$o->insert('subjects',
-                ip => $ip,
-                double_dip => 0,
+                cookie_id => $cid,
+                cookie_expires_t => $cookie_expires_t,
+                ip => $ENV{REMOTE_ADDR},
+                double_dip => $double_dipped,
                 first_seen_t => time);
-            %s = $o->getrow('subjects', ip => $ip);
-            $o->{sn} = $s{sn};
+            %s = $o->getrow('subjects', cookie_id => $cid);
             $o->{mturk} and
                 $o->insert('mturk',
-                    sn => $o->{sn},
+                    sn => $s{sn},
                     workerid => $p{workerId},
                     hitid => $p{hitId},
-                    assignmentid => $p{assignmentId})});}
+                    assignmentid => $p{assignmentId},
+                    reconciled => 0);});}
+    $o->ensure_header;
+    $o->{sn} = $s{sn};
+    $o->{completion_key} = $s{completion_key};
+    $o->{cid} = $cookie->value;
+
+    $s{double_dip} and $o->double_dipped;
+    defined $o->{completion_key} and $o->completion_page;
 
     unless ($s{consented_t})
        {if ($o->{assume_consent} or
@@ -202,13 +234,15 @@ sub init
         {$_->{k} =>
            {first_sent => $_->{first_sent},
             received => $_->{received}}}
-        $o->getrows('timing', sn => $o->{sn})};
-    $o->ensure_header;}
+        $o->getrows('timing', sn => $o->{sn})};}
 
 sub ensure_header
    {my $self = shift;
     $self->{printed_header} and return;
     print
+        exists $self->{set_cookie}
+          ? 'Set-Cookie: ' . $self->{set_cookie} . "\n"
+          : '',
         "Content-Type: text/html; charset=utf-8\n",
         "\n",
         qq{<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"\n},
@@ -430,9 +464,11 @@ sub image_button_page
 
 sub completion_page
    {my $self = shift;
-    $self->modify('subjects',
-       {sn => $self->{sn}, completed_t => undef},
-       {completed_t => time});
+    unless (defined $self->{completion_key})
+       {$self->{completion_key} = rand_base64_str;
+        $self->modify('subjects', {sn => $self->{sn}},
+           {completion_key => $self->{completion_key},
+            completed_t => time});}
     print $self->{experiment_complete};
     if ($self->{mturk})
       # Create a HIT-submission button.
@@ -442,10 +478,12 @@ sub completion_page
               ? $mturk_production_submit_url
               : $mturk_sandbox_submit_url),
             join '',
-                 (map {sprintf '<input type="hidden" name="%s" value="%s"/>',
-                           map {htmlsafe $_} @$_}
-                    [assignmentId => $r{assignmentid}],
-                    [hitId => $r{hitid}]),
+                  map2
+                   (sub {sprintf '<input type="hidden" name="%s" value="%s"/>', @_},
+                    map {htmlsafe $_}
+                    assignmentId => $r{assignmentid},
+                    hitId => $r{hitid},
+                    tversky_completion_key => $self->{completion_key}),
                 '<button name="submit_hit_button" value="submitted" type="submit">Submit HIT</button>';}
     $self->quit;}
 
@@ -509,12 +547,15 @@ sub replace
        ($self->{tables}{$table}, \%fields);
     $statement =~ s/\AINSERT /INSERT OR REPLACE /i or die 'insert-or-replace';
     $self->sql($statement, @bind);}
+sub getitem
+   {my ($self, $table, $expr, %where) = @_;
+    scalar(($self->sel($table, $expr, \%where)->flat)[0])}
 sub getrows
    {my ($self, $table, %where) = @_;
     $self->sel($table, '*', \%where)->hashes};
 sub getrow
    {my ($self, $table, %where) = @_;
-    %{ ($self->sel($table, '*', \%where)->hashes)[0] || {} } };
+    %{ ($self->sel($table, '*', \%where)->hashes)[0] || {} };}
 sub count
    {my ($self, $table, %where) = @_;
     ($self->sel($table, 'count(*)', \%where)->flat)[0];}
