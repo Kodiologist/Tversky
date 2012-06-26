@@ -78,6 +78,7 @@ sub new
          assume_consent => 0, # Turn it on for testing.
          here_url => undef,
          cookie_lifespan => 12*60*60, # 12 hours
+         cookie_name_suffix => undef,
 
          database_path => undef,
          tables => {},
@@ -136,7 +137,7 @@ sub init
 
     my $cookie;
        {my %h = CGI::Cookie->fetch;
-        %h and $cookie = $h{Tversky_ID};}
+        %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
     my %s;
     defined $cookie
         and %s = $o->getrow('subjects', cookie_id => $cookie->value);
@@ -158,7 +159,7 @@ sub init
             while $o->count('subjects', cookie_id => $cid);
         my $cookie_expires_t = time + $o->{cookie_lifespan};
         $cookie = new CGI::Cookie
-           (-name => 'Tversky_ID',
+           (-name => 'Tversky_ID_' . $o->{cookie_name_suffix},
             -value => $cid,
             -expires => "+$o->{cookie_lifespan}s",
               # May differ slightly from $cookie_expires_t, yeah,
