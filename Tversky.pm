@@ -61,6 +61,12 @@ sub map2 (&@)
         {$f->(@_[2*$_, 2*$_ + 1])}
         0 .. (int(@_/2) - 1);}
 
+sub hidden_inputs
+   {cat map2
+        sub {sprintf '<input type="hidden" name="%s" value="%s"/>', @_},
+        map {htmlsafe $_}
+        @_}
+
 sub image_button_page_proc
    {/\A(\d+)\z/ or return undef;
     my $n = $1;
@@ -131,6 +137,12 @@ sub init
     $o->{db}->{sqlite_see_if_its_a_number} = 1;
     $o->sql('pragma foreign_keys = on');
 
+    if ($ENV{REQUEST_METHOD} eq 'POST')
+       {defined $ENV{HTTP_REFERER}
+            or die 'Possible XSRF attempt: POST with no referer';
+        $ENV{HTTP_REFERER} =~ m!\A\Q$o->{here_url}\E(?:\z|\?|/)!
+            or die "Possible XSRF attempt: POST with referer $ENV{HTTP_REFERER} (needed: $o->{here_url})";}
+
     my %p = do 
        {my $cgi = new CGI::Minimal;
         map {$_ => $cgi->param($_)} $cgi->param};
@@ -139,87 +151,93 @@ sub init
        {my %h = CGI::Cookie->fetch;
         %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
     my %s;
-    defined $cookie
-        and %s = $o->getrow('subjects', cookie_id => $cookie->value);
+    if (defined $cookie)
+       {%s = $o->getrow('subjects', cookie_id => $cookie->value);
+        $o->{sn} = $s{sn};}
     unless (defined $cookie
             and %s and time <= $s{cookie_expires_t}
             and !($o->{mturk}
-                and $ENV{REQUEST_METHOD} eq 'GET'
                 and exists $p{workerId}
                 and $p{workerId} ne $o->getitem('mturk', 'workerid', sn => $s{sn})))
+
        {if ($o->{mturk} and !exists $p{workerId} || !exists $p{assignmentId} || !exists $p{hitId})
           # The worker is previewing this HIT. Or at any rate,
           # they haven't shown us a good cookie but nor have they
-          # provided all three of the MTurk parameters, so we might
-          # as well just show a preview.
-           {$o->{preview}->($o);
+          # provided all three of the MTurk parameters, so we
+          # might as well just show a preview.
+           {$o->ensure_header;
+            $o->{preview}->($o);
             $o->quit;}
-        my $cid;
-        do {$cid = rand_base64_str}
-            while $o->count('subjects', cookie_id => $cid);
-        my $cookie_expires_t = time + $o->{cookie_lifespan};
-        $cookie = new CGI::Cookie
-           (-name => 'Tversky_ID_' . $o->{cookie_name_suffix},
-            -value => $cid,
-            -expires => "+$o->{cookie_lifespan}s",
-              # May differ slightly from $cookie_expires_t, yeah,
-              # yeah, who cares.
-            -secure => 1,
-            -httponly => 1);
-        $o->{set_cookie} = $cookie->as_string;
-        $o->ensure_header;
-        my $double_dipped = $o->{mturk} && $o->count('mturk',
-            workerid => $p{workerId},
-            -bool => 'reconciled');
-          # The worker that this user is claiming to be has already
-          # done this task (or has been included in the MTurk table
-          # to keep them out of it).
-        $o->transaction(sub
-           {$o->insert('subjects',
-                cookie_id => $cid,
-                cookie_expires_t => $cookie_expires_t,
-                ip => $ENV{REMOTE_ADDR},
-                double_dip => $double_dipped,
-                first_seen_t => time);
-            %s = $o->getrow('subjects', cookie_id => $cid);
-            $o->{mturk} and
-                $o->insert('mturk',
+
+        elsif ($o->{mturk} and $o->count('mturk',
+                workerid => $p{workerId},
+                -bool => 'reconciled'))
+          # The worker that this user is claiming to be has
+          # already done this task (or has been included in the
+          # MTurk table to keep them out of it).
+           {$o->ensure_header;
+            $o->double_dipped_page;}
+
+        elsif ($o->{assume_consent}
+                or $ENV{REQUEST_METHOD} eq 'POST'
+                   and $p{consent_statement}
+                   and $p{consent_statement} =~ $o->{consent_regex})
+          # The subject just consented. Give them a cookie
+          # and set up the experiment.
+           {my $cid;
+            do {$cid = rand_base64_str}
+                while $o->count('subjects', cookie_id => $cid);
+            my $cookie_expires_t = time + $o->{cookie_lifespan};
+            $cookie = new CGI::Cookie
+               (-name => 'Tversky_ID_' . $o->{cookie_name_suffix},
+                -value => $cid,
+                -expires => "+$o->{cookie_lifespan}s",
+                  # May differ slightly from $cookie_expires_t,
+                  # yeah, yeah, who cares.
+                -secure => 1,
+                -httponly => 1);
+            $o->transaction(sub
+               {$o->insert('subjects',
+                    cookie_id => $cid,
+                    cookie_expires_t => $cookie_expires_t,
+                    ip => $ENV{REMOTE_ADDR},
+                    consented_t => $o->{assume_consent}
+                      ? 'assumed'
+                      : time ,
+                    task_version => $o->{task_version});
+                %s = $o->getrow('subjects', cookie_id => $cid);
+                $o->{sn} = $s{sn};
+                $o->{mturk} and $o->insert('mturk',
                     sn => $s{sn},
                     workerid => $p{workerId},
                     hitid => $p{hitId},
                     assignmentid => $p{assignmentId},
-                    reconciled => 0);});}
+                    reconciled => 0);
+                $o->{after_consent_prep}->($o);});
+            $o->{set_cookie} = $cookie->as_string;
+            $o->ensure_header;
+            if ($o->{mturk} and $o->{mturk_prompt_new_window})
+               {$o->prompt_new_window_page;}}
+
+        else
+          # The subject hasn't consented, so show the consent form.
+           {$o->ensure_header;
+            print slurp($o->{consent_path});
+            print $o->form(sprintf '<div style="%s">%s<br>%s%s</div>',
+                'text-align: center',
+                '<input type="text" class="consent_statement" name="consent_statement" value="">',
+                '<button type="submit" name="consent_button" value="submitted">OK</button>',
+                !$o->{mturk} ? '' : hidden_inputs
+                   (workerId => $p{workerId},
+                    hitId => $p{hitId},
+                    assignmentId => $p{assignmentId}));
+            $o->quit;}}
+
     $o->ensure_header;
-    $o->{sn} = $s{sn};
     $o->{completion_key} = $s{completion_key};
     $o->{cid} = $cookie->value;
 
-    $s{double_dip} and $o->double_dipped;
     defined $o->{completion_key} and $o->completion_page;
-
-    unless ($s{consented_t})
-       {if ($o->{assume_consent} or
-            $p{consent_statement} and
-            $p{consent_statement} =~ $o->{consent_regex})
-          # The subject just consented. Log the time and task
-          # version and set up the experiment.
-           {$o->transaction(sub
-               {$o->modify('subjects', {sn => $o->{sn}},
-                   {consented_t => $o->{assume_consent}
-                      ? 'assumed'
-                      : time,
-                    task_version => $o->{task_version}});
-                $o->{after_consent_prep}->($o);});
-            if ($o->{mturk} and $o->{mturk_prompt_new_window})
-               {$o->prompt_new_window_page;}}
-        else
-          # The subject hasn't consented, so show the consent form.
-           {print slurp($o->{consent_path});
-            print $o->form(sprintf '<div style="%s">%s<br>%s</div>',
-                'text-align: center',
-                '<input type="text" class="consent_statement" name="consent_statement" value="">',
-                '<button type="submit" name="consent_button" value="submitted">OK</button>');
-            $o->quit;}}
 
     if ($o->{mturk} and $o->{mturk_prompt_new_window}
             and exists $p{workerId})
@@ -227,7 +245,8 @@ sub init
       # MTurk.
        {$o->prompt_new_window_page;}
 
-    $o->{params} = \%p;
+    $ENV{REQUEST_METHOD} eq 'POST'
+        and $o->{post_params} = \%p;
     $o->{user} = {map
         {$_->{k} => $_->{v}}
         $o->getrows('user', sn => $o->{sn})};
@@ -474,18 +493,15 @@ sub completion_page
     if ($self->{mturk})
       # Create a HIT-submission button.
        {my %r = $self->getrow('mturk', sn => $self->{sn});
-        print sprintf '<form method="post" action="%s">%s</form>',
+        print sprintf '<form method="post" action="%s">%s%s</form>',
             htmlsafe($self->{mturk} eq 'production'
               ? $mturk_production_submit_url
               : $mturk_sandbox_submit_url),
-            join '',
-                  map2
-                   (sub {sprintf '<input type="hidden" name="%s" value="%s"/>', @_},
-                    map {htmlsafe $_}
-                    assignmentId => $r{assignmentid},
-                    hitId => $r{hitid},
-                    tversky_completion_key => $self->{completion_key}),
-                '<button name="submit_hit_button" value="submitted" type="submit">Submit HIT</button>';}
+            hidden_inputs
+               (assignmentId => $r{assignmentid},
+                hitId => $r{hitid},
+                tversky_completion_key => $self->{completion_key}),
+            '<button name="submit_hit_button" value="submitted" type="submit">Submit HIT</button>';}
     $self->quit;}
 
 sub loop
@@ -570,7 +586,7 @@ sub transaction
     else
        {$self->{db}->commit;}}
 
-sub double_dipped
+sub double_dipped_page
    {my $self = shift;
     print "<p>It looks like you participated in another study that makes you ineligible for this one (perhaps the same study as a different HIT). Please return this HIT.</p>";
     $self->quit;}
@@ -591,21 +607,22 @@ sub page
         # all looks good, record it and move on; otherwise, repeat
         # the task.
         VALIDATE: {
-        if (exists $self->{params}{key} and
-                $self->{params}{key} eq htmlsafe($key))
+        if ($self->{post_params} and
+                exists $self->{post_params}{key} and
+                $self->{post_params}{key} eq htmlsafe($key))
            {my %to_save;
             foreach my $f (@{$h{fields}})
-               {exists $self->{params}{$f->{name}} or last VALIDATE;
-                local $_ = $self->{params}{$f->{name}};
+               {exists $self->{post_params}{$f->{name}} or last VALIDATE;
+                local $_ = $self->{post_params}{$f->{name}};
                 my $v = $f->{proc}->();
                 defined $v or last VALIDATE;
                 exists $f->{k} and $to_save{$f->{k}} = $v;}
             $self->transaction(sub
                {$self->save($_, $to_save{$_}) foreach keys %to_save;
                 $self->now_done($key);});
-            # Clear $self->{params} so responses to this task aren't
-            # mistaken for responses to another task.
-            $self->{params} = {};
+            # Delete $self->{post_params} so responses to this
+            # task aren't mistaken for responses to another task.
+            delete $self->{post_params};
             return;}}}
 
     # Show the task.
@@ -644,3 +661,5 @@ sub now_done
     $self->modify('timing',
         {sn => $self->{sn}, k => $key},
         {received => $self->{timing}{$key}{received}});}
+
+1;
