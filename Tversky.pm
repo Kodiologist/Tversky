@@ -14,8 +14,6 @@ use File::Slurp 'slurp';
 
 my $rand_base64_str_bytes = 6;
   # 6 bytes encode to 8 characters of Base64.
-my $mturk_sandbox_submit_url = 'https://workersandbox.mturk.com/mturk/externalSubmit';
-my $mturk_production_submit_url = 'https://www.mturk.com/mturk/externalSubmit';
 
 # --------------------------------------------------
 # Public subroutines
@@ -80,7 +78,7 @@ sub image_button_page_proc
 sub new
    {my $invocant = shift;
     my %h =
-        (mturk => undef,
+        (mturk => 0,
          assume_consent => 0, # Turn it on for testing.
          here_url => undef,
          cookie_lifespan => 12*60*60, # 12 hours
@@ -125,10 +123,8 @@ sub init
 
     defined $o->{tables}{$_} or die "No table supplied for '$_'"
         foreach qw(subjects timing user);
-    if ($o->{mturk})
-       {$o->{mturk} eq 'sandbox' or $o->{mturk} eq 'production'
-            or die "Illegal value for 'mturk': $o->{mturk}";
-        defined $o->{tables}{'mturk'} or die "No table supplied for 'mturk'";}
+    !$o->{mturk} or defined $o->{tables}{'mturk'}
+        or die "No table supplied for 'mturk'";
 
     $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}")
         or die DBIx::Simple->error;
@@ -160,10 +156,10 @@ sub init
                 and exists $p{workerId}
                 and $p{workerId} ne $o->getitem('mturk', 'workerid', sn => $s{sn})))
 
-       {if ($o->{mturk} and !exists $p{workerId} || !exists $p{assignmentId} || !exists $p{hitId})
+       {if ($o->{mturk} and !exists $p{workerId} || !exists $p{assignmentId} || !exists $p{hitId} || !exists $p{turkSubmitTo})
           # The worker is previewing this HIT. Or at any rate,
           # they haven't shown us a good cookie but nor have they
-          # provided all three of the MTurk parameters, so we
+          # provided all four of the MTurk parameters, so we
           # might as well just show a preview.
            {$o->ensure_header;
             $o->{preview}->($o);
@@ -212,6 +208,7 @@ sub init
                     workerid => $p{workerId},
                     hitid => $p{hitId},
                     assignmentid => $p{assignmentId},
+                    submit_to => $p{turkSubmitTo},
                     reconciled => 0);
                 $o->{after_consent_prep}->($o);});
             $o->{set_cookie} = $cookie->as_string;
@@ -230,7 +227,8 @@ sub init
                 !$o->{mturk} ? '' : hidden_inputs
                    (workerId => $p{workerId},
                     hitId => $p{hitId},
-                    assignmentId => $p{assignmentId}));
+                    assignmentId => $p{assignmentId},
+                    turkSubmitTo => $p{turkSubmitTo}));
             $o->quit;}}
 
     $o->ensure_header;
@@ -494,9 +492,7 @@ sub completion_page
       # Create a HIT-submission button.
        {my %r = $self->getrow('mturk', sn => $self->{sn});
         print sprintf '<form method="post" action="%s">%s%s</form>',
-            htmlsafe($self->{mturk} eq 'production'
-              ? $mturk_production_submit_url
-              : $mturk_sandbox_submit_url),
+            htmlsafe($r{submit_to} . '/mturk/externalSubmit'),
             hidden_inputs
                (assignmentId => $r{assignmentid},
                 hitId => $r{hitid},
