@@ -475,6 +475,19 @@ sub multiple_choice_page
             proc => sub
                {in $_, map2 {$_[0]} @choices}}]);}
 
+my @generic_labels = ('A' .. 'Z');
+
+sub shuffled_multiple_choice_page
+   {my ($self, $key, $content, @choices) = @_;
+    @choices/2 > @generic_labels and die "Not enough generic labels";
+    $self->assign_permutation("$key.permutation",
+        ',', 0 .. (@choices/2 - 1));
+    my @permutation = split qr/,/, $self->getu("$key.permutation"); 
+    my $i = 0;
+    $self->multiple_choice_page($key, $content, map
+        {[$choices[2*$_], $generic_labels[$i++]] => $choices[2*$_ + 1]}
+        @permutation);}
+
 sub buttons_page
    {my ($self, $key, $content, @buttons) = @_;
     $self->multiple_choice_page($key, $content, map {$_, ''} @buttons);}
