@@ -464,9 +464,12 @@ sub multiple_choice_page
             html => sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
                 map2
                    {my ($label, $body) = @_;
+                    (my $value, $label) = ref($label)
+                      ? (@$label)
+                      : ($label, $label);
                     sprintf '<div class="row">%s%s</div>',
                         sprintf('<div class="button"><button name="multiple_choice" value="%s" type="submit">%s</button></div>',
-                            htmlsafe($label), htmlsafe($label)),
+                            htmlsafe($value), htmlsafe($label)),
                         "<div class='body'>$body</div>"}
                 @choices),
             proc => sub
