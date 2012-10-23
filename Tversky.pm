@@ -299,11 +299,13 @@ sub existsu
 
 sub randomly_assign
    {my ($self, $key, @vals) = @_;
-    $self->save($key, randelm @vals);}
+    $self->existsu($key)
+        or $self->save($key, randelm @vals);}
 
 sub assign_permutation
    {my ($self, $key, $separator, @vals) = @_;
-    $self->save($key, join $separator, shuffle @vals);}
+    $self->existsu($key)
+        or $self->save($key, join $separator, shuffle @vals);}
 
 sub image_button
    {my $self = shift;
