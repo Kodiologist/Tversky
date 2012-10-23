@@ -279,10 +279,18 @@ sub save
         sn => $self->{sn}, k => $key, v => $value);
     $self->{user}{$key} = $value;}
 
+sub sn
+   {my $self = shift;
+    $self->{sn};}
+
 sub getu
    {my ($self, $key) = @_;
     exists $self->{user}{$key}
         or die "getu on unset key: $key";
+    $self->{user}{$key};}
+
+sub maybe_getu
+   {my ($self, $key) = @_;
     $self->{user}{$key};}
 
 sub existsu
