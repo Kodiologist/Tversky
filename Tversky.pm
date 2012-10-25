@@ -457,23 +457,24 @@ sub yesno_page
 
 sub multiple_choice_page
    {my ($self, $key, $content, @choices) = @_;
+    @choices = map2
+        {ref $_[0] ? ($_[0], $_[1]) : ([$_[0], $_[0]], $_[1])}
+        @choices;
     $self->page(key => $key,
         content => $content,
         fields => [{name => 'multiple_choice',
             k => $key,
             html => sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
                 map2
-                   {my ($label, $body) = @_;
-                    (my $value, $label) = ref($label)
-                      ? (@$label)
-                      : ($label, $label);
+                   {my ($value, $label) = @{shift()};
+                    my $body = shift;
                     sprintf '<div class="row">%s%s</div>',
                         sprintf('<div class="button"><button name="multiple_choice" value="%s" type="submit">%s</button></div>',
                             htmlsafe($value), htmlsafe($label)),
                         "<div class='body'>$body</div>"}
                 @choices),
             proc => sub
-               {in $_, map2 {$_[0]} @choices}}]);}
+               {in $_, map2 {$_[0][0]} @choices}}]);}
 
 my @generic_labels = ('A' .. 'Z');
 
