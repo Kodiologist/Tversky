@@ -542,6 +542,16 @@ sub loop
         $self->save($key, ++$_);}
     die 'loop attempted to run more than twice for one request';}
 
+sub get_loop_iters
+# Returns the number of completed iterations of the given loop.
+   {my ($self, $key) = @_;
+    my $v = $self->maybe_getu($key);
+    defined $v
+      ? $v =~ /\ALAST (\d+)/
+        ? $1 + 1
+        : $v
+      : 0}
+
 sub last
    {die "LAST\n";}
 
