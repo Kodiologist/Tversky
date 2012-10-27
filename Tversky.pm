@@ -49,6 +49,11 @@ sub shuffle
 # Private subroutines
 # --------------------------------------------------
 
+use constant HTTP_OK => '200 OK';
+use constant HTTP_CANTDOTHAT => '422 Unprocessable Entity'; 
+use constant HTTP_FORBIDDEN => '403 Forbidden';
+use constant HTTP_MYFAULT => '500 Internal Server Error';
+
 sub in
    {my $item = shift;
     $item eq $_ and return $_ foreach @_;
@@ -127,7 +132,7 @@ sub run
        {$self->init;
         $f->();
         $self->completion_page;};
-    $self->ensure_header;
+    $self->ensure_header(HTTP_MYFAULT);
     defined $@ or $@ = 'Exited "run" with undefined $@';
     $@ eq '' and $@ = 'Exited "run" with $@ set to the null string';
     warn $@;
@@ -158,18 +163,18 @@ sub init
     my $chosen_sn;
     if (exists $p{NEW_SUBJECT} and defined $o->{password_hash})
        {BLOCK:
-           {my $error =
+           {my ($code, $msg) =
                 $ENV{REQUEST_METHOD} ne 'POST' || !exists $p{password}
-              ? ''
+              ? (HTTP_OK, '')
               : sha256_base64($o->{password_salt} . $p{password}) ne $o->{password_hash}
-              ? 'Bad credentials.'
+              ? (HTTP_FORBIDDEN, 'Bad credentials.')
               : $p{sn} !~ /\A\d+\z/
-              ? 'The given subject number is not an integer.'
+              ? (HTTP_CANTDOTHAT, 'The given subject number is not an integer.')
               : $o->count('subjects', sn => $p{sn})
-              ? 'That subject number is already taken. Pick a different one.'
+              ? (HTTP_CANTDOTHAT, 'That subject number is already taken. Pick a different one.')
               : last BLOCK;
-            $o->ensure_header;
-            $error and print '<p><strong>Error:</strong> ', $error, '</p>';
+            $o->ensure_header($code);
+            $msg and print '<p><strong>Error:</strong> ', $msg, '</p>';
             print $o->form(
                 sprintf('<p style="text-align: left">%s</p>', join '<br>',
                     '<label>Experimenter: <input type="text" name="experimeter" value=""></label>',
@@ -213,7 +218,7 @@ sub init
             $o->double_dipped_page;}
 
         elsif (defined $o->{password_hash} and not defined $chosen_sn)
-           {$o->ensure_header;
+           {$o->ensure_header(HTTP_FORBIDDEN);
             print '<p>Access denied.</p>';
             $o->quit;}
 
@@ -302,9 +307,10 @@ sub init
         $o->getrows('timing', sn => $o->{sn})};}
 
 sub ensure_header
-   {my $self = shift;
+   {my ($self, $response_code) = @_;
     $self->{printed_header} and return;
     print
+        'Status: ', ($response_code || HTTP_OK), "\n",
         exists $self->{set_cookie}
           ? 'Set-Cookie: ' . $self->{set_cookie} . "\n"
           : '',
