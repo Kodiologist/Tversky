@@ -78,6 +78,7 @@ sub image_button_page_proc
 
 sub new
    {my $invocant = shift;
+
     my %h =
         (mturk => 0,
          assume_consent => 0, # Turn it on for testing.
@@ -105,7 +106,19 @@ sub new
          head => '<title>Study</title>',
          footer => "</body></html>\n",
          @_);
-    bless \%h, ref($invocant) || $invocant;}
+    my $o = bless \%h, ref($invocant) || $invocant;
+
+    defined $o->{tables}{$_} or die "No table supplied for '$_'"
+        foreach qw(subjects timing user);
+    !$o->{mturk} or defined $o->{tables}{'mturk'}
+        or die "No table supplied for 'mturk'";
+    if (defined $o->{password_hash})
+       {$o->{password_salt}
+            or die 'No salt defined';
+        $o->{assume_consent}
+            or die 'password_hash without assume_consent is not implemented';}
+
+    $o;}
 
 sub run
    {my ($self, $f) = @_;
@@ -124,16 +137,6 @@ sub run
 
 sub init
    {my $o = shift;
-
-    defined $o->{tables}{$_} or die "No table supplied for '$_'"
-        foreach qw(subjects timing user);
-    !$o->{mturk} or defined $o->{tables}{'mturk'}
-        or die "No table supplied for 'mturk'";
-    if (defined $o->{password_hash})
-       {$o->{password_salt}
-            or die 'No salt defined';
-        $o->{assume_consent}
-            or die 'password_hash without assume_consent is not implemented';}
 
     $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}")
         or die DBIx::Simple->error;
