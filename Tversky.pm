@@ -11,6 +11,7 @@ use CGI::Minimal;
 use CGI::Cookie;
 use HTML::Entities 'encode_entities';
 use File::Slurp 'slurp';
+use Digest::SHA 'sha256_base64';
 
 my $rand_base64_str_bytes = 6;
   # 6 bytes encode to 8 characters of Base64.
@@ -84,6 +85,9 @@ sub new
          cookie_lifespan => 12*60*60, # 12 hours
          cookie_name_suffix => undef,
 
+         password_hash => undef,
+         password_salt => undef,
+
          database_path => undef,
          tables => {},
 
@@ -125,6 +129,11 @@ sub init
         foreach qw(subjects timing user);
     !$o->{mturk} or defined $o->{tables}{'mturk'}
         or die "No table supplied for 'mturk'";
+    if (defined $o->{password_hash})
+       {$o->{password_salt}
+            or die 'No salt defined';
+        $o->{assume_consent}
+            or die 'password_hash without assume_consent is not implemented';}
 
     $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}")
         or die DBIx::Simple->error;
@@ -143,6 +152,31 @@ sub init
        {my $cgi = new CGI::Minimal;
         map {$_ => $cgi->param($_)} $cgi->param};
 
+    my $chosen_sn;
+    if (exists $p{NEW_SUBJECT} and defined $o->{password_hash})
+       {BLOCK:
+           {my $error =
+                $ENV{REQUEST_METHOD} ne 'POST' || !exists $p{password}
+              ? ''
+              : sha256_base64($o->{password_salt} . $p{password}) ne $o->{password_hash}
+              ? 'Bad credentials.'
+              : $p{sn} !~ /\A\d+\z/
+              ? 'The given subject number is not an integer.'
+              : $o->count('subjects', sn => $p{sn})
+              ? 'That subject number is already taken. Pick a different one.'
+              : last BLOCK;
+            $o->ensure_header;
+            $error and print '<p><strong>Error:</strong> ', $error, '</p>';
+            print $o->form(
+                sprintf('<p style="text-align: left">%s</p>', join '<br>',
+                    '<label>Experimenter: <input type="text" name="experimeter" value=""></label>',
+                      # Currently, this field is ignored.
+                    '<label>Password: <input type="password" name="password" value=""></label>',
+                    '<label>Subject number (must be an integer): <input type="text" name="sn" value=""></label>'),
+                '<p><button type="submit" name="NEW_SUBJECT" value="start">Start Task</button></p>');
+            $o->quit;}
+        $chosen_sn = $p{sn};}
+
     my $cookie;
        {my %h = CGI::Cookie->fetch;
         %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
@@ -151,6 +185,7 @@ sub init
        {%s = $o->getrow('subjects', cookie_id => $cookie->value);
         $o->{sn} = $s{sn};}
     unless (defined $cookie
+            and !defined $chosen_sn
             and %s and time <= $s{cookie_expires_t}
             and !($o->{mturk}
                 and exists $p{workerId}
@@ -174,6 +209,11 @@ sub init
            {$o->ensure_header;
             $o->double_dipped_page;}
 
+        elsif (defined $o->{password_hash} and not defined $chosen_sn)
+           {$o->ensure_header;
+            print '<p>Access denied.</p>';
+            $o->quit;}
+
         elsif ($o->{assume_consent}
                 or $ENV{REQUEST_METHOD} eq 'POST'
                    and $p{consent_statement}
@@ -194,6 +234,10 @@ sub init
                 -httponly => 1);
             $o->transaction(sub
                {$o->insert('subjects',
+                    sn => $chosen_sn,
+                      # Generally, $chosen_sn will be undefined,
+                      # which is fine: SQLite will choose a subject
+                      # number for us.
                     cookie_id => $cid,
                     cookie_expires_t => $cookie_expires_t,
                     ip => $ENV{REMOTE_ADDR},
