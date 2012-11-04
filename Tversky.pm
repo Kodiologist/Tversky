@@ -13,9 +13,6 @@ use HTML::Entities 'encode_entities';
 use File::Slurp 'slurp';
 use Digest::SHA 'sha256_base64';
 
-my $rand_base64_str_bytes = 6;
-  # 6 bytes encode to 8 characters of Base64.
-
 # --------------------------------------------------
 # Public subroutines
 # --------------------------------------------------
@@ -27,13 +24,13 @@ sub htmlsafe ($)
    {encode_entities $_[0], q(<>&"')}
 
 my $urandom_fh;
-sub rand_base64_str ()
+sub rand_32bit_int ()
    {defined $urandom_fh
         or open $urandom_fh, '<:raw', '/dev/urandom';
     my $buffer;
-    read $urandom_fh, $buffer, $rand_base64_str_bytes;
-    require MIME::Base64;
-    MIME::Base64::encode_base64($buffer, '');}
+    read $urandom_fh, $buffer, 4;
+        # There are 4 bytes in a 32-bit word.
+    unpack 'l', $buffer;}
 
 sub randelm
    {$_[ int(rand() * @_) ]}
@@ -228,9 +225,7 @@ sub init
                    and $p{consent_statement} =~ $o->{consent_regex})
           # The subject just consented. Give them a cookie
           # and set up the experiment.
-           {my $cid;
-            do {$cid = rand_base64_str}
-                while $o->count('subjects', cookie_id => $cid);
+           {my $cid = rand_32bit_int;
             my $cookie_expires_t = time + $o->{cookie_lifespan};
             $cookie = new CGI::Cookie
                (-name => 'Tversky_ID_' . $o->{cookie_name_suffix},
@@ -563,7 +558,7 @@ sub image_button_page
 sub completion_page
    {my $self = shift;
     unless (defined $self->{completion_key})
-       {$self->{completion_key} = rand_base64_str;
+       {$self->{completion_key} = rand_32bit_int;
         $self->modify('subjects', {sn => $self->{sn}},
            {completion_key => $self->{completion_key},
             completed_t => time});}
