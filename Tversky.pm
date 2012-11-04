@@ -160,7 +160,7 @@ sub init
        {my $cgi = new CGI::Minimal;
         map {$_ => $cgi->param($_)} $cgi->param};
 
-    my $chosen_sn;
+    my ($chosen_sn, $experimenter);
     if (exists $p{NEW_SUBJECT} and defined $o->{password_hash})
        {BLOCK:
            {my ($code, $msg) =
@@ -177,13 +177,13 @@ sub init
             $msg and print '<p><strong>Error:</strong> ', $msg, '</p>';
             print $o->form(
                 sprintf('<p style="text-align: left">%s</p>', join '<br>',
-                    '<label>Experimenter: <input type="text" name="experimeter" value=""></label>',
-                      # Currently, this field is ignored.
+                    '<label>Experimenter: <input type="text" name="experimenter" value=""></label>',
                     '<label>Password: <input type="password" name="password" value=""></label>',
                     '<label>Subject number (must be an integer): <input type="text" name="sn" value=""></label>'),
                 '<p><button type="submit" name="NEW_SUBJECT" value="start">Start Task</button></p>');
             $o->quit;}
-        $chosen_sn = $p{sn};}
+        $chosen_sn = $p{sn};
+        $experimenter = $p{experimenter};}
 
     my $cookie;
        {my %h = CGI::Cookie->fetch;
@@ -246,6 +246,7 @@ sub init
                       # Generally, $chosen_sn will be undefined,
                       # which is fine: SQLite will choose a subject
                       # number for us.
+                    experimenter => $experimenter,
                     cookie_id => $cid,
                     cookie_expires_t => $cookie_expires_t,
                     ip => $ENV{REMOTE_ADDR},
