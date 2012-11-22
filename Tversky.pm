@@ -552,8 +552,13 @@ my @generic_labels = ('A' .. 'Z');
 sub shuffled_multiple_choice_page
    {my ($self, $key, $content, %choices) = @_;
     keys(%choices) > @generic_labels and die 'Not enough generic labels';
-    $self->assign_permutation("$key.permutation", ',', keys %choices);
-    my @permutation = split qr/,/, $self->getu("$key.permutation"); 
+    my @permutation = defined $key
+      ? do
+         {$self->assign_permutation("$key.permutation", ',', keys %choices);
+          split qr/,/, $self->getu("$key.permutation");}
+      : # When $key is undefined, we can't touch the database,
+        # but we don't have to be consistent, either.
+        shuffle keys %choices;
     my $i = 0;
     $self->multiple_choice_page($key, $content, map
         {[$_, $generic_labels[$i++]] => $choices{$_}}
