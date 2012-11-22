@@ -593,12 +593,12 @@ sub loop
     $self->existsu($key)
         or $self->save($key, 0);
     $_ = $self->getu($key);
-    /\ALAST / and return;
+    /\ADONE / and return;
     foreach my $UNUSED (1, 2)
        {eval {$f->()};
         if ($@)
-           {if ($@ eq "LAST\n")
-              {$self->save($key, "LAST $_");
+           {if ($@ =~ /\ADONE(\d*)\Z/)
+              {$self->save($key, 'DONE ' . (length($1) ? $1 : $_ + 1));
                return;}
             die;}
         $self->save($key, ++$_);}
@@ -609,13 +609,16 @@ sub get_loop_iters
    {my ($self, $key) = @_;
     my $v = $self->maybe_getu($key);
     defined $v
-      ? $v =~ /\ALAST (\d+)/
-        ? $1 + 1
+      ? $v =~ /\ADONE (\d+)/
+        ? $1
         : $v
       : 0}
 
-sub last
-   {die "LAST\n";}
+sub done
+   {my ($self, $iterations_completed) = @_;
+    die sprintf "DONE%s\n", defined $iterations_completed
+      ? $iterations_completed
+      : '';}
 
 sub quit
    {my $self = shift;
