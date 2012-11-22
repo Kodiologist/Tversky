@@ -455,6 +455,15 @@ sub text_entry_page
                 html => '<p><button class="next_button" name="text_entry_submit_button" value="submit" type="submit">OK</button></p>',
                 proc => sub { $_ eq 'submit' or undef }}]);}
 
+sub nonneg_int_entry_page
+   {my ($self, $key, $content) = @_;
+    $self->text_entry_page($key, $content,
+        hint => 'Enter a whole number.',
+        proc => sub
+           {/\A \s* (\d+) \s* \z/x
+              ? $1
+              : undef});}
+
 sub dollars_entry_page
    {my ($self, $key, $content) = @_;
     $self->text_entry_page($key, $content,
