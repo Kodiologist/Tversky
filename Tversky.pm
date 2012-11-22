@@ -346,6 +346,12 @@ sub existsu
    {my ($self, $key) = @_;
     exists $self->{user}{$key};}
 
+sub save_once
+   {my ($self, $key, $f) = @_;
+    unless ($self->existsu($key))
+       {$self->save($key, $f->());}
+    $self->getu($key);}
+
 sub randomly_assign
    {my ($self, $key, @vals) = @_;
     $self->existsu($key)
