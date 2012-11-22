@@ -107,6 +107,8 @@ sub new
 
          head => '<title>Study</title>',
          footer => "</body></html>\n",
+
+         rserve_host => 'localhost',
          @_);
     my $o = bless \%h, ref($invocant) || $invocant;
 
@@ -351,6 +353,11 @@ sub save_once
     unless ($self->existsu($key))
        {$self->save($key, $f->());}
     $self->getu($key);}
+
+sub rserve_call
+   {my ($self, $fun, @args) = @_;
+    $self->init_rserve;
+    $self->{rserve}->call($fun, @args);}
 
 sub randomly_assign
    {my ($self, $key, @vals) = @_;
@@ -672,6 +679,14 @@ sub transaction
         die;}
     else
        {$self->{db}->commit;}}
+
+sub init_rserve
+   {my $self = shift;
+    unless (exists $self->{rserve})
+       {require Rserve::Connection;
+        $self->{rserve} = new Rserve::Connection($self->{rserve_host}) or die;
+        Rserve::Connection->init;}
+    return 1;}
 
 sub double_dipped_page
    {my $self = shift;
