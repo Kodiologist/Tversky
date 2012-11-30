@@ -5,7 +5,7 @@ create table Subjects
     cookie_expires_t  integer       not null,
     ip                text          not null,
     consented_t       integer       not null,
-    task_version      text          not null,
+    task              text          not null,
     completed_t       integer,
     completion_key    integer);
 

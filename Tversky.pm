@@ -106,7 +106,7 @@ sub new
 
          experiment_complete => '<p>The experiment is complete. Thanks for your help!</p>',
 
-         task_version => undef,
+         task => undef,
          preview => sub { print '<p>(No preview available.)</p>' },
          after_consent_prep => sub {},
 
@@ -251,7 +251,7 @@ sub init
                     consented_t => $o->{assume_consent}
                       ? 'assumed'
                       : time ,
-                    task_version => $o->{task_version});
+                    task => $o->{task});
                 %s = $o->getrow(SUBJECTS, cookie_id => $cid);
                 $o->{sn} = $s{sn};
                 $o->{mturk} and $o->insert(MTURK,
