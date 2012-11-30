@@ -51,6 +51,12 @@ use constant HTTP_CANTDOTHAT => '422 Unprocessable Entity';
 use constant HTTP_FORBIDDEN => '403 Forbidden';
 use constant HTTP_MYFAULT => '500 Internal Server Error';
 
+# Table names
+use constant SUBJECTS => 'Subjects';
+use constant USER => 'D';
+use constant TIMING => 'Timing';
+use constant MTURK => 'MTurk';
+
 sub in
    {my $item = shift;
     $item eq $_ and return $_ foreach @_;
@@ -92,7 +98,6 @@ sub new
          password_salt => undef,
 
          database_path => undef,
-         tables => {},
 
          consent_path => undef,
          consent_regex => qr/\A \s* ['"]? \s* i \s+ consent \s* ['"]? \s* \z/xi,
@@ -112,10 +117,6 @@ sub new
          @_);
     my $o = bless \%h, ref($invocant) || $invocant;
 
-    defined $o->{tables}{$_} or die "No table supplied for '$_'"
-        foreach qw(subjects timing user);
-    !$o->{mturk} or defined $o->{tables}{'mturk'}
-        or die "No table supplied for 'mturk'";
     if (defined $o->{password_hash})
        {$o->{password_salt}
             or die 'No salt defined';
@@ -169,7 +170,7 @@ sub init
               ? (HTTP_FORBIDDEN, 'Bad credentials.')
               : $p{sn} !~ /\A\d+\z/
               ? (HTTP_CANTDOTHAT, 'The given subject number is not an integer.')
-              : $o->count('subjects', sn => $p{sn})
+              : $o->count(SUBJECTS, sn => $p{sn})
               ? (HTTP_CANTDOTHAT, 'That subject number is already taken. Pick a different one.')
               : last BLOCK;
             $o->ensure_header($code);
@@ -189,14 +190,14 @@ sub init
         %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
     my %s;
     if (defined $cookie)
-       {%s = $o->getrow('subjects', cookie_id => $cookie->value);
+       {%s = $o->getrow(SUBJECTS, cookie_id => $cookie->value);
         $o->{sn} = $s{sn};}
     unless (defined $cookie
             and !defined $chosen_sn
             and %s and time <= $s{cookie_expires_t}
             and !($o->{mturk}
                 and exists $p{workerId}
-                and $p{workerId} ne $o->getitem('mturk', 'workerid', sn => $s{sn})))
+                and $p{workerId} ne $o->getitem(MTURK, 'workerid', sn => $s{sn})))
 
        {if ($o->{mturk} and !exists $p{workerId} || !exists $p{assignmentId} || !exists $p{hitId} || !exists $p{turkSubmitTo})
           # The worker is previewing this HIT. Or at any rate,
@@ -207,7 +208,7 @@ sub init
             $o->{preview}->($o);
             $o->quit;}
 
-        elsif ($o->{mturk} and $o->count('mturk',
+        elsif ($o->{mturk} and $o->count(MTURK,
                 workerid => $p{workerId},
                 -bool => 'reconciled'))
           # The worker that this user is claiming to be has
@@ -238,7 +239,7 @@ sub init
                 -secure => 1,
                 -httponly => 1);
             $o->transaction(sub
-               {$o->insert('subjects',
+               {$o->insert(SUBJECTS,
                     sn => $chosen_sn,
                       # Generally, $chosen_sn will be undefined,
                       # which is fine: SQLite will choose a subject
@@ -251,9 +252,9 @@ sub init
                       ? 'assumed'
                       : time ,
                     task_version => $o->{task_version});
-                %s = $o->getrow('subjects', cookie_id => $cid);
+                %s = $o->getrow(SUBJECTS, cookie_id => $cid);
                 $o->{sn} = $s{sn};
-                $o->{mturk} and $o->insert('mturk',
+                $o->{mturk} and $o->insert(MTURK,
                     sn => $s{sn},
                     workerid => $p{workerId},
                     hitid => $p{hitId},
@@ -297,12 +298,12 @@ sub init
         and $o->{post_params} = \%p;
     $o->{user} = {map
         {$_->{k} => $_->{v}}
-        $o->getrows('user', sn => $o->{sn})};
+        $o->getrows(USER, sn => $o->{sn})};
     $o->{timing} = {map
         {$_->{k} =>
            {first_sent => $_->{first_sent},
             received => $_->{received}}}
-        $o->getrows('timing', sn => $o->{sn})};}
+        $o->getrows(TIMING, sn => $o->{sn})};}
 
 sub ensure_header
    {my ($self, $response_code) = @_;
@@ -326,7 +327,7 @@ sub ensure_header
 
 sub save
    {my ($self, $key, $value) = @_;
-    $self->replace('user',
+    $self->replace(USER,
         sn => $self->{sn}, k => $key, v => $value);
     $self->{user}{$key} = $value;}
 
@@ -586,13 +587,13 @@ sub completion_page
    {my $self = shift;
     unless (defined $self->{completion_key})
        {$self->{completion_key} = rand_32bit_int;
-        $self->modify('subjects', {sn => $self->{sn}},
+        $self->modify(SUBJECTS, {sn => $self->{sn}},
            {completion_key => $self->{completion_key},
             completed_t => time});}
     print $self->{experiment_complete};
     if ($self->{mturk})
       # Create a HIT-submission button.
-       {my %r = $self->getrow('mturk', sn => $self->{sn});
+       {my %r = $self->getrow(MTURK, sn => $self->{sn});
         print sprintf '<form method="post" action="%s">%s%s</form>',
             htmlsafe($r{submit_to} . '/mturk/externalSubmit'),
             hidden_inputs
@@ -651,28 +652,26 @@ sub sql
 
 sub sel
    {my $self = shift;
-    $self->{db}->select($self->{tables}{$_[0]}, @_[1 .. $#_])
+    $self->{db}->select($_[0], @_[1 .. $#_])
         or die $self->{db}->error;}
 sub modify
    {my ($self, $table, $where, $update) = @_;
-    $self->{db}->update($self->{tables}{$table}, $update, $where)
+    $self->{db}->update($table, $update, $where)
         or die $self->{db}->error;}
 sub insert
    {my ($self, $table, %fields) = @_;
-    $self->{db}->insert($self->{tables}{$table}, \%fields)
+    $self->{db}->insert($table, \%fields)
         or die $self->{db}->error;}
 sub maybe_insert
 # Like "insert" above, but uses SQLite's INSERT OR IGNORE.
    {my ($self, $table, %fields) = @_;
-    my ($statement, @bind) = $sql_abstract->insert
-       ($self->{tables}{$table}, \%fields);
+    my ($statement, @bind) = $sql_abstract->insert($table, \%fields);
     $statement =~ s/\AINSERT /INSERT OR IGNORE /i or die 'insert-or-ignore';
     $self->sql($statement, @bind);}
 sub replace
 # Like "insert" above, but uses SQLite's INSERT OR REPLACE.
    {my ($self, $table, %fields) = @_;
-    my ($statement, @bind) = $sql_abstract->insert
-       ($self->{tables}{$table}, \%fields);
+    my ($statement, @bind) = $sql_abstract->insert($table, \%fields);
     $statement =~ s/\AINSERT /INSERT OR REPLACE /i or die 'insert-or-replace';
     $self->sql($statement, @bind);}
 sub getitem
@@ -768,7 +767,7 @@ sub begin
     defined $self->{timing}{$key}{received} and return 0;
     unless (defined $self->{timing}{$key}{first_sent})
        {$self->{timing}{$key}{first_sent} = time;
-        $self->insert('timing',
+        $self->insert(TIMING,
             sn => $self->{sn},
             k => $key,
             first_sent => $self->{timing}{$key}{first_sent});}
@@ -777,7 +776,7 @@ sub begin
 sub now_done
    {my ($self, $key) = @_;
     $self->{timing}{$key}{received} = time;
-    $self->modify('timing',
+    $self->modify(TIMING,
         {sn => $self->{sn}, k => $key},
         {received => $self->{timing}{$key}{received}});}
 
