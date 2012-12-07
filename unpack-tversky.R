@@ -7,7 +7,7 @@ ordf = function(`_data`, ...)
 # Data = ordf(Data, FactorB, -FactorA, …)
    {m = match.call()
     `_data`[eval(as.call(c(quote(order), as.list(m)[c(-1, -2)])),
-        `_data`, parent.frame()),]}
+        `_data`, parent.frame()),, drop = F]}
 
 posix.ct = function(n)
 # Converts a Unix time to a POSIXct.
