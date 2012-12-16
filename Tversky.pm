@@ -296,14 +296,8 @@ sub init
 
     $ENV{REQUEST_METHOD} eq 'POST'
         and $o->{post_params} = \%p;
-    $o->{user} = {map
-        {$_->{k} => $_->{v}}
-        $o->getrows(USER, sn => $o->{sn})};
-    $o->{timing} = {map
-        {$_->{k} =>
-           {first_sent => $_->{first_sent},
-            received => $_->{received}}}
-        $o->getrows(TIMING, sn => $o->{sn})};}
+
+    $o->cache_tables;}
 
 sub ensure_header
    {my ($self, $response_code) = @_;
@@ -352,7 +346,15 @@ sub existsu
 sub save_once
    {my ($self, $key, $f) = @_;
     unless ($self->existsu($key))
-       {$self->save($key, $f->());}
+       {my $value = $f->();
+        my $inserted = $self->maybe_insert(USER,
+            sn => $self->{sn}, k => $key, v => $value);
+        if ($inserted)
+           {$self->{user}{$key} = $value;}
+        else
+          # Somebody else inserted a row for this key while
+          # $f was running.
+           {$self->cache_tables;}}
     $self->getu($key);}
 
 sub rserve_call
@@ -664,10 +666,11 @@ sub insert
         or die $self->{db}->error;}
 sub maybe_insert
 # Like "insert" above, but uses SQLite's INSERT OR IGNORE.
+# Returns 1 if a row was inserted, 0 otherwise.
    {my ($self, $table, %fields) = @_;
     my ($statement, @bind) = $sql_abstract->insert($table, \%fields);
     $statement =~ s/\AINSERT /INSERT OR IGNORE /i or die 'insert-or-ignore';
-    $self->sql($statement, @bind);}
+    $self->sql($statement, @bind)->rows;}
 sub replace
 # Like "insert" above, but uses SQLite's INSERT OR REPLACE.
    {my ($self, $table, %fields) = @_;
@@ -695,6 +698,17 @@ sub transaction
         die;}
     else
        {$self->{db}->commit;}}
+
+sub cache_tables
+   {my $self = shift;
+    $self->{user} = {map
+        {$_->{k} => $_->{v}}
+        $self->getrows(USER, sn => $self->{sn})};
+    $self->{timing} = {map
+        {$_->{k} =>
+           {first_sent => $_->{first_sent},
+            received => $_->{received}}}
+        $self->getrows(TIMING, sn => $self->{sn})};}
 
 sub init_rserve
    {my $self = shift;
