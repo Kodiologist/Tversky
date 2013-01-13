@@ -440,7 +440,7 @@ sub text_entry_page
                 k => $key,
                 html => sprintf('<div class="text_entry">%s%s</div>',
                   $options{multiline}
-                    ? '<textarea class="text_entry" name="text_entry"></textarea>'
+                    ? '<textarea class="text_entry" name="text_entry" rows="3" cols="30"></textarea>'
                     : '<input type="text" class="text_entry" name="text_entry">',
                   defined $options{hint}
                     ? sprintf '<div class="hint">%s</div>', $options{hint}
