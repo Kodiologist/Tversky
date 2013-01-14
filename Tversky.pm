@@ -376,10 +376,11 @@ sub image_button
    {my $self = shift;
     my %options =
        (image_url => undef, alt => undef, anchors => undef,
-        example => 0, @_);
+        bump => '0', example => 0, @_);
     defined $options{anchors} and @{$options{anchors}} != 2 and
          die 'anchors must have exactly 2 elements';
-    return sprintf '<div class="image_button">%s%s%s</div>',
+    return sprintf '<div class="image_button" style="%s">%s%s%s</div>',
+        "padding-top: $options{bump}",
         $options{anchors}
           ? sprintf('<div class="anchor">%s</div>',
                 htmlsafe $options{anchors}[0])
@@ -573,6 +574,21 @@ sub buttons_page
 
 sub image_button_page
    {my ($self, $key, $content, %options) = @_;
+    if (exists $options{bump})
+      # Add a margin ($options{bump}, which is a CSS value for a
+      # margin) to the button for every other image_button_page.
+      # This keeps subjects from just clicking again without
+      # moving the mouse.
+       {if (not $self->existsu("$key.bump"))
+           {$self->save_once('TVERSKY.prev_bump', sub {'Yes'});
+            my $bump_now = $self->getu('TVERSKY.prev_bump') eq 'No';
+            $self->save("$key.bump", $bump_now
+              ? $options{bump}
+              : '0');
+            $self->save('TVERSKY.prev_bump', $bump_now
+              ? 'Yes'
+              : 'No');}
+        $options{bump} = $self->getu("$key.bump");}
     $self->page(key => $key,
         content => $content,
         fields =>
