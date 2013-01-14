@@ -45,7 +45,7 @@ unpack.tversky = function(db.path,
     subjects = subset(subjects, !(sn %in% exclude.sns) &
         (include.incomplete | !is.na(completed_t)))
     subjects = cbind(
-        s = tversky.sid(subjects$sn),
+        s = ordered(tversky.sid(subjects$sn)),
         subjects)
     row.names(subjects) = subjects$s
     subjects = transform(subjects,
@@ -68,7 +68,7 @@ unpack.tversky = function(db.path,
             k = factor(k)),
         sn)
     dlong = cbind(
-        s = tversky.sid(dlong$sn),
+        s = ordered(tversky.sid(dlong$sn)),
         subset(dlong, select = -sn))
     dwide = ordf(dcast(dlong, s ~ k, value.var = "v"), s)
     row.names(dwide) = dwide$s
@@ -80,7 +80,7 @@ unpack.tversky = function(db.path,
             d = received - first_sent),
         sn, first_sent)
     timing = cbind(
-        s = tversky.sid(timing$sn),
+        s = ordered(tversky.sid(timing$sn)),
         subset(timing, select = -sn))
     tdiff = dcast(timing, s ~ k, value.var = "d")
     row.names(tdiff) = as.character(tdiff$s)
