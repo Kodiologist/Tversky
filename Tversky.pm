@@ -5,6 +5,7 @@ use strict;
 use parent 'Exporter';
 our @EXPORT_OK = qw(cat htmlsafe randelm shuffle);
 
+use Config;
 use DBIx::Simple;
 use SQL::Abstract;
 use CGI::Minimal;
@@ -24,13 +25,19 @@ sub htmlsafe ($)
    {encode_entities $_[0], q(<>&"')}
 
 my $urandom_fh;
-sub rand_32bit_int ()
+sub randint ()
    {defined $urandom_fh
         or open $urandom_fh, '<:raw', '/dev/urandom';
     my $buffer;
-    read $urandom_fh, $buffer, 4;
-        # There are 4 bytes in a 32-bit word.
-    unpack 'l', $buffer;}
+    if ($Config{ivsize} >= 8)
+      # We have 64-bit integers, so return one. (SQLite integers
+      # are always 64-bit.)
+       {read $urandom_fh, $buffer, 8;
+        unpack 'q', $buffer;}
+    else
+      # Return a 32-bit integer.
+       {read $urandom_fh, $buffer, 4;
+        unpack 'l', $buffer;}}
 
 sub randelm
    {$_[ int(rand() * @_) ]}
@@ -228,7 +235,7 @@ sub init
                    and $p{consent_statement} =~ $o->{consent_regex})
           # The subject just consented. Give them a cookie
           # and set up the experiment.
-           {my $cid = rand_32bit_int;
+           {my $cid = randint;
             my $cookie_expires_t = time + $o->{cookie_lifespan};
             $cookie = new CGI::Cookie
                (-name => 'Tversky_ID_' . $o->{cookie_name_suffix},
@@ -604,7 +611,7 @@ sub image_button_page
 sub completion_page
    {my $self = shift;
     unless (defined $self->{completion_key})
-       {$self->{completion_key} = rand_32bit_int;
+       {$self->{completion_key} = randint;
         $self->modify(SUBJECTS, {sn => $self->{sn}},
            {completion_key => $self->{completion_key},
             completed_t => time});}
