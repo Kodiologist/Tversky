@@ -35,3 +35,11 @@ create table D   -- "D" is for "data".
     k                 text          not null,
     v                 text,
     primary key (sn, k));
+
+create table Conditions
+   (cn                              integer primary key,
+    k                 text          not null,
+    v                 text          not null,
+    sn                integer
+      references Subjects(sn),
+    unique (sn, k));

@@ -63,6 +63,9 @@ use constant SUBJECTS => 'Subjects';
 use constant USER => 'D';
 use constant TIMING => 'Timing';
 use constant MTURK => 'MTurk';
+use constant CONDITIONS => 'Conditions';
+
+my $sql_abstract = new SQL::Abstract;
 
 sub in
    {my $item = shift;
@@ -379,6 +382,22 @@ sub assign_permutation
     $self->existsu($key)
         or $self->save($key, join $separator, shuffle @vals);}
 
+sub get_condition
+# Pick a new condition for this subject from the conditions
+# table, or, if one has already been assigned, return that.
+   {my ($self, $key) = @_;
+    $self->save_once($key, sub
+      # Claim the least unused condition number (cn) for this key.
+       {$self->modify(CONDITIONS,
+           {cn => do
+               {my ($stmt, @bind) = $sql_abstract->select(CONDITIONS,
+                    'min(cn)',
+                    {k => $key, sn => undef});
+                \ ["= ($stmt)", @bind]}},
+           {sn => $self->{sn}});
+        $self->getitem(CONDITIONS, 'v',
+            sn => $self->{sn}, k => $key);});}
+
 sub image_button
    {my $self = shift;
     my %options =
@@ -669,8 +688,6 @@ sub quit
 # Private methods
 # --------------------------------------------------
 
-my $sql_abstract = new SQL::Abstract;
-
 sub sql
    {my $self = shift;
     $self->{db}->query(@_) or die $self->{db}->error}
@@ -679,6 +696,7 @@ sub sel
    {my $self = shift;
     $self->{db}->select($_[0], @_[1 .. $#_])
         or die $self->{db}->error;}
+
 sub modify
    {my ($self, $table, $where, $update) = @_;
     $self->{db}->update($table, $update, $where)
