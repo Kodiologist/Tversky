@@ -3,7 +3,7 @@ package Tversky;
 use strict;
 
 use parent 'Exporter';
-our @EXPORT_OK = qw(cat htmlsafe randelm shuffle);
+our %EXPORT_TAGS;
 
 use Config;
 use DBIx::Simple;
@@ -17,6 +17,8 @@ use Digest::SHA 'sha256_base64';
 # --------------------------------------------------
 # Public subroutines
 # --------------------------------------------------
+
+our @EXPORT_OK = qw(cat htmlsafe randint randelm shuffle);
 
 sub cat
    {join '', @_}
@@ -49,6 +51,13 @@ sub shuffle
         $k == $n or @a[$k, $n] = @a[$n, $k];}
     return @a;}
 
+$EXPORT_TAGS{table_names} = [qw(SUBJECTS USER TIMING MTURK CONDITIONS)];
+use constant SUBJECTS => 'Subjects';
+use constant USER => 'D';
+use constant TIMING => 'Timing';
+use constant MTURK => 'MTurk';
+use constant CONDITIONS => 'Conditions';
+
 # --------------------------------------------------
 # Private subroutines
 # --------------------------------------------------
@@ -57,13 +66,6 @@ use constant HTTP_OK => '200 OK';
 use constant HTTP_CANTDOTHAT => '422 Unprocessable Entity'; 
 use constant HTTP_FORBIDDEN => '403 Forbidden';
 use constant HTTP_MYFAULT => '500 Internal Server Error';
-
-# Table names
-use constant SUBJECTS => 'Subjects';
-use constant USER => 'D';
-use constant TIMING => 'Timing';
-use constant MTURK => 'MTurk';
-use constant CONDITIONS => 'Conditions';
 
 my $sql_abstract = new SQL::Abstract;
 
@@ -834,5 +836,12 @@ sub now_done
     $self->modify(TIMING,
         {sn => $self->{sn}, k => $key},
         {received => $self->{timing}{$key}{received}});}
+
+# --------------------------------------------------
+# End
+# --------------------------------------------------
+
+push @EXPORT_OK, @$_
+    foreach values %EXPORT_TAGS;
 
 1;

@@ -11,6 +11,9 @@ Also included in this repository are:
 ``schema.sql``
     A schema for the SQLite database.
 
+``add-conditions.pl``
+    A Perl script to add values to the Conditions table in shuffled order. Use it to randomly assign conditions while controlling cell sizes.
+
 ``mturk-tversky-reconcile.py``
     A Python script that checks that workers who completed your task really were the workers they claimed to be. See, MTurk has no means of authenticating Worker IDs, so Tversky simply records whatever Worker ID is claimed and leaves it to you to reconcile the database against MTurk. The code in Tversky that prevents workers from doing the same task twice will only screen out workers with reconciled completed assignments. This means that, yes, it is possible for anybody to do the task by faking their Worker ID, but once they've submitted the assignment, you can see the real Worker ID and reject it, so there's no point from their perspective. Anyway, before running this script, be sure to set the environment variable ``BOTO_MTURK_CLI`` to the location of the ``mturk`` program from `my fork of boto`_.
 
