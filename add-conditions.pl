@@ -6,9 +6,8 @@ use DBIx::Simple;
 use URI::Escape 'uri_escape_utf8';
 use Tversky qw(shuffle :table_names);
 
-@ARGV > 2 or die "Usage: $0 DATABASE KEY [VALUE=QUANTITY]+";
-my ($database_path, $key) = splice @ARGV, 0, 2;
-my %add = map {split '='} @ARGV;
+@ARGV > 3 or die "Usage: $0 DATABASE KEY NUMBER-OF-BLOCKS [VALUE]+";
+my ($database_path, $key, $blocks, @values) = @ARGV;
 
 # ----------------------------------------------------------
 
@@ -19,7 +18,10 @@ $db->query('pragma foreign_keys = on')
     or die $db->error;
 
 $db->begin;
-$db->insert(CONDITIONS, {k => $key, v => $_})
-        or die $db->error
-    foreach shuffle map {($_) x $add{$_}} keys %add;
+foreach (1 .. $blocks)
+   {foreach (shuffle @values)
+       {$db->insert(CONDITIONS, {k => $key, v => $_})
+            or die $db->error;}}
 $db->commit;
+printf "Added %d conditions.\n",
+    $blocks * @values;
