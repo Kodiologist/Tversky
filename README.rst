@@ -26,7 +26,7 @@ Tversky is named for Amos Tversky, who died for our economic sins and deserved t
 License
 ============================================================
 
-This program is copyright 2012 Kodi Arfer.
+This program is copyright 2012–2013 Kodi Arfer.
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
