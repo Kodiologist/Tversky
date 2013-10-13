@@ -4,7 +4,7 @@ You should take the absence of documentation as a hint that I'm not making any g
 
 As for security, Tversky should resist SQL-injection attacks and cross-site request forgery, but I haven't thought about race conditions much. You should run your CGI script in taint mode, of course.
 
-The ``reserve_call`` method requires the ``call`` method of Rserve::Connection that I defined in `my fork of Rserve-perl`_.
+The ``rserve_call`` method requires the ``call`` method of Rserve::Connection that I defined in `my fork of Rserve-perl`_.
 
 Also included in this repository are:
 
