@@ -155,11 +155,10 @@ sub run
 sub init
    {my $o = shift;
 
-    $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}")
-        or die DBIx::Simple->error;
-    $o->{db}->abstract = new SQL::Abstract;
-    $o->{db}->{sqlite_unicode} = 1;
-    $o->{db}->{sqlite_see_if_its_a_number} = 1;
+    $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}", '', '',
+       {RaiseError => 1,
+        sqlite_unicode => 1,
+        sqlite_see_if_its_a_number => 1});
     $o->sql('pragma foreign_keys = on');
 
     if ($ENV{REQUEST_METHOD} eq 'POST')
@@ -692,21 +691,18 @@ sub quit
 
 sub sql
    {my $self = shift;
-    $self->{db}->query(@_) or die $self->{db}->error}
+    $self->{db}->query(@_)}
 
 sub sel
    {my $self = shift;
-    $self->{db}->select($_[0], @_[1 .. $#_])
-        or die $self->{db}->error;}
+    $self->{db}->select($_[0], @_[1 .. $#_])}
 
 sub modify
    {my ($self, $table, $where, $update) = @_;
-    $self->{db}->update($table, $update, $where)
-        or die $self->{db}->error;}
+    $self->{db}->update($table, $update, $where);}
 sub insert
    {my ($self, $table, %fields) = @_;
-    $self->{db}->insert($table, \%fields)
-        or die $self->{db}->error;}
+    $self->{db}->insert($table, \%fields);}
 sub maybe_insert
 # Like "insert" above, but uses SQLite's INSERT OR IGNORE.
 # Returns 1 if a row was inserted, 0 otherwise.
@@ -725,7 +721,7 @@ sub getitem
     scalar(($self->sel($table, $expr, \%where)->flat)[0])}
 sub getrows
    {my ($self, $table, %where) = @_;
-    $self->sel($table, '*', \%where)->hashes};
+    $self->sel($table, '*', \%where)->hashes;}
 sub getrow
    {my ($self, $table, %where) = @_;
     %{ ($self->sel($table, '*', \%where)->hashes)[0] || {} };}
