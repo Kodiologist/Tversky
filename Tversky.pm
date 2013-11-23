@@ -92,6 +92,55 @@ sub image_button_page_proc
     $n =~ s/\A0+//;
     $n eq '' ? 0 : $n}
 
+sub measurement_entry_proc
+   {my ($str, $unit_reader) = @_;
+    $str =~ /[[:alpha:]]\.\d/
+      # Ambiguous: does "2lbs.3oz" mean 2 lbs 3 oz or
+      # 2 lbs 0.3 oz?
+        and return undef;
+    # Now we can safely remove all periods after units.
+    $str =~ s/([[:alpha:]])\./$1/g;
+    # Remove plus signs, spaces, commas, and the word "and".
+    $str =~ s/ +and +//g;
+    $str =~ s/[ +,]//g;
+    # Now try to interpret what's left.
+    my $sum;
+    while ($str =~ s/\A (\d+ | \d*\.\d+ ) ([[:alpha:]]+) //gx)
+       {my ($x, $u) = ($1, $unit_reader->($2));
+        defined $u or return undef;
+        $sum += $x * $u;}
+    # The input should be empty now.
+    length($str) and return undef;
+    return $sum;}
+
+sub length_reader
+   {my $str = lc(shift);
+        in($str, qw(m ms meter meters metre metres))
+      ? 1
+      : in($str, qw(cm cms centimeter centimeters centimetre centimetres))
+      ? .01
+      : in($str, qw(mm mms millimeter millimeters millimetre millimetres))
+      ? .001
+      : in($str, qw(ft foot feet foots))
+      ? .3048
+      : in($str, qw(in ins inch inches inchs))
+      ? .0254
+      : undef}
+
+sub mass_reader
+   {my $str = lc(shift);
+        in($str, qw(kg kgs kilogram kilograms kilogramme kilogrammes))
+      ? 1
+      : in($str, qw(g gs gram grams gramme grammes))
+      ? .001
+      : in($str, qw(mg mgs milligram milligrams milligramme milligrammes))
+      ? 1e-6
+      : in($str, qw(lb lbs pound pounds))
+      ? 0.45359237
+      : in($str, qw(oz ozs ounce ounces))
+      ? (0.45359237 / 16)
+      : undef}
+
 # --------------------------------------------------
 # Public methods
 # --------------------------------------------------
@@ -533,6 +582,20 @@ sub dollars_entry_page
            {/\A (?: \$ \s*)? (\d+ (?: \.\d\d?)? | \.\d\d? ) (?: \s* \$)? \z/x
               ? $1
               : undef});}
+
+sub length_entry_page
+# The length is stored in meters.
+   {my ($self, $key, $content) = @_;
+    $self->text_entry_page($key, $content,
+        hint => 'Enter a length, including a unit (such as "m" or "ft").',
+        proc => sub {measurement_entry_proc($_, \&length_reader)});}
+
+sub weight_entry_page
+# The weight is stored in kilograms.
+   {my ($self, $key, $content) = @_;
+    $self->text_entry_page($key, $content,
+        hint => 'Enter a weight, including a unit (such as "pounds" or "kg").',
+        proc => sub {measurement_entry_proc($_, \&mass_reader)});}
 
 sub discrete_rating_page
    {my ($self, $key, $content) = splice @_, 0, 3;

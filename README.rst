@@ -17,6 +17,9 @@ Also included in this repository are:
 ``mturk-tversky-reconcile.py``
     A Python script that checks that workers who completed your task really were the workers they claimed to be. See, MTurk has no means of authenticating Worker IDs, so Tversky simply records whatever Worker ID is claimed and leaves it to you to reconcile the database against MTurk. The code in Tversky that prevents workers from doing the same task twice will only screen out workers with reconciled completed assignments. This means that, yes, it is possible for anybody to do the task by faking their Worker ID, but once they've submitted the assignment, you can see the real Worker ID and reject it, so there's no point from their perspective. Anyway, before running this script, be sure to set the environment variable ``BOTO_MTURK_CLI`` to the location of the ``mturk`` program from `my fork of boto`_.
 
+``test.pl``
+    A test suite. Currently, it only tests Tversky's internal functions for parsing and doing arithmetic with units of measurement.
+
 See also `Kodi.R`_ for an R function ``unpack.tversky`` with which to import a Tversky database as a list of data frames.
 
 Tversky is similar to but distinct from `SchizoidPy`_, which is a Python module to run psychology experiments locally. Tversky and SchizoidPy have different APIs because of the fundamental differences between web programming and application programming (which I, unlike a lot of people these days, am hardly eager to smooth over), but I've tried not to make them needlessly inconsistent.
