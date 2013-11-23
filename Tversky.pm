@@ -368,6 +368,20 @@ sub save_once
            {$self->cache_tables;}}
     $self->getu($key);}
 
+sub save_once_atomic
+# Like save_once, but $f is executed inside a transaction.
+   {my ($self, $key, $f) = @_;
+    $self->existsu($key) or $self->transaction(sub
+       {my ($row) = $self->getrows(USER, sn => $self->{sn}, k => $key);
+        if ($row)
+           {# Somebody else inserted a row for this key
+            # between the $self->existsu($key) and the database
+            # lock.
+            $self->cache_tables;}
+        else
+           {$self->save($key, $f->());}});
+    $self->getu($key);}
+
 sub rserve_call
    {my ($self, $fun, @args) = @_;
     $self->init_rserve;
