@@ -509,6 +509,22 @@ sub nonneg_int_entry_page
               ? $1
               : undef});}
 
+sub percent_entry_page
+# Note that the entry is stored as a proportion of 1, not 100.
+   {my ($self, $key, $content) = @_;
+    $self->text_entry_page($key, $content,
+        hint => 'Enter a percentage.',
+        proc => sub
+           {/\A \s* (
+                    (?<whole> \d+) |
+                    (?<whole> \d*) \s* \. \s* (?<frac> \d+) )
+                \s* (?: % \s*)? \z/x or return undef;
+            if ($+{whole} > 99)
+               {$+{whole} == 100 or return undef;
+                $+{frac} > 0 and return undef;
+                return 1;}
+            "$+{whole}.$+{frac}" / 100});}
+
 sub dollars_entry_page
    {my ($self, $key, $content) = @_;
     $self->text_entry_page($key, $content,
