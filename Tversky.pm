@@ -587,7 +587,7 @@ sub length_entry_page
 # The length is stored in meters.
    {my ($self, $key, $content) = @_;
     $self->text_entry_page($key, $content,
-        hint => 'Enter a length, including a unit (such as "m" or "ft").',
+        hint => 'Enter a length, including a unit (such as "m" or "ft"; multi-unit sums like "1 ft 3 in" are allowed).',
         proc => sub {measurement_entry_proc($_, \&length_reader)});}
 
 sub weight_entry_page
