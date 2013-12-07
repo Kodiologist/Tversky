@@ -555,7 +555,7 @@ sub nonneg_int_entry_page
         hint => 'Enter a whole number.',
         proc => sub
            {s/,//g;
-            /\A \s* (\d+) \s* \z/x
+            /\A(\d+)\z/
               ? $1
               : undef});}
 
@@ -565,10 +565,10 @@ sub percent_entry_page
     $self->text_entry_page($key, $content,
         hint => 'Enter a percentage.',
         proc => sub
-           {/\A \s* (
+           {/\A (
                     (?<whole> \d+) |
                     (?<whole> \d*) \s* \. \s* (?<frac> \d+) )
-                \s* (?: % \s*)? \z/x or return undef;
+                (?: \s* % )? \z/x or return undef;
             if ($+{whole} > 99)
                {$+{whole} == 100 or return undef;
                 $+{frac} > 0 and return undef;
