@@ -554,7 +554,8 @@ sub nonneg_int_entry_page
     $self->text_entry_page($key, $content,
         hint => 'Enter a whole number.',
         proc => sub
-           {/\A \s* (\d+) \s* \z/x
+           {s/,//g;
+            /\A \s* (\d+) \s* \z/x
               ? $1
               : undef});}
 
@@ -579,7 +580,8 @@ sub dollars_entry_page
     $self->text_entry_page($key, $content,
         hint => 'Enter a dollar amount. Cents are allowed.',
         proc => sub
-           {/\A (?: \$ \s*)? (\d+ (?: \.\d\d?)? | \.\d\d? ) (?: \s* \$)? \z/x
+           {s/,//g;
+            /\A (?: \$ \s*)? (\d+ (?: \.\d\d?)? | \.\d\d? ) (?: \s* \$)? \z/x
               ? $1
               : undef});}
 
