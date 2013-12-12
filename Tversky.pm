@@ -747,7 +747,7 @@ sub loop
    {my ($self, $key, $f) = @_;
     $self->existsu($key)
         or $self->save($key, 0);
-    $_ = $self->getu($key);
+    local $_ = $self->getu($key);
     /\ADONE / and return;
     foreach my $UNUSED (1, 2)
        {eval {$f->()};
