@@ -18,7 +18,7 @@ use Digest::SHA 'sha256_base64';
 # Public subroutines
 # --------------------------------------------------
 
-our @EXPORT_OK = qw(cat htmlsafe randint randelm shuffle);
+our @EXPORT_OK = qw(cat htmlsafe randint randelm shuffle FREE_RESPONSE);
 
 sub cat
    {join '', @_}
@@ -51,6 +51,9 @@ sub shuffle
         $k == $n or @a[$k, $n] = @a[$n, $k];}
     return @a;}
 
+use constant FREE_RESPONSE => [];
+sub is_FREE_RESPONSE {ref($_[0]) and ref($_[0]) eq 'ARRAY' and @{$_[0]} == 0}
+
 $EXPORT_TAGS{table_names} = [qw(SUBJECTS USER TIMING MTURK CONDITIONS)];
 use constant SUBJECTS => 'Subjects';
 use constant USER => 'D';
@@ -68,6 +71,9 @@ use constant HTTP_FORBIDDEN => '403 Forbidden';
 use constant HTTP_MYFAULT => '500 Internal Server Error';
 
 my $sql_abstract = new SQL::Abstract;
+
+our %pp;
+  # This gets bound to all post parameters inside 'proc' subs.
 
 sub in
    {my $item = shift;
@@ -652,6 +658,8 @@ sub yesno_page
             proc => sub 
                {$_ eq 'Yes' || $_ eq 'No' ? $_ : undef;}}]);}
 
+my $multiple_choice_fr_max_chars = 1024;
+
 sub multiple_choice_page
    {my ($self, $key, $content, @choices) = @_;
     @choices = map2
@@ -668,10 +676,25 @@ sub multiple_choice_page
                     sprintf '<div class="row">%s%s</div>',
                         sprintf('<div class="button"><button name="multiple_choice" value="%s" type="submit">%s</button></div>',
                             htmlsafe($value), htmlsafe($label)),
-                        "<div class='body'>$body</div>"}
+                        sprintf('<div class="body">%s</div>', is_FREE_RESPONSE($body)
+                          ? sprintf('<input type="text" class="text_entry" name="multiple_choice_fr.%s" value="">',
+                              htmlsafe($value))
+                          : $body)}
                 @choices),
             proc => sub
-               {in $_, map2 {$_[0][0]} @choices}}]);}
+               {foreach my $i (0 .. int(@choices/2) - 1)
+                   {my $value = $choices[2*$i][0];
+                    my $body = $choices[2*$i + 1];
+                    $_ eq $value or next;
+                    is_FREE_RESPONSE($body) or return $value;
+                    my $input = $pp{"multiple_choice_fr.$value"};
+                    defined $input or return undef;
+                    $input =~ s/\A\s+//;
+                    $input =~ s/\s+\z//;
+                    $input eq '' and return undef;
+                    $input = substr $input, 0, $multiple_choice_fr_max_chars;
+                    return "[FR] $input";}
+                undef;}}]);}
 
 my @generic_labels = ('A' .. 'Z');
 
@@ -877,9 +900,10 @@ sub page
                 exists $self->{post_params}{key} and
                 $self->{post_params}{key} eq htmlsafe($key))
            {my %to_save;
+            local *pp = $self->{post_params};
             foreach my $f (@{$h{fields}})
-               {exists $self->{post_params}{$f->{name}} or last VALIDATE;
-                local $_ = $self->{post_params}{$f->{name}};
+               {exists $pp{$f->{name}} or last VALIDATE;
+                local $_ = $pp{$f->{name}};
                 my $v = $f->{proc}->();
                 defined $v or last VALIDATE;
                 exists $f->{k} and $to_save{$f->{k}} = $v;}
