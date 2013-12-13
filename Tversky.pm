@@ -444,13 +444,11 @@ sub rserve_call
 
 sub randomly_assign
    {my ($self, $key, @vals) = @_;
-    $self->existsu($key)
-        or $self->save($key, randelm @vals);}
+    $self->save_once($key, sub {randelm @vals});}
 
 sub assign_permutation
    {my ($self, $key, $separator, @vals) = @_;
-    $self->existsu($key)
-        or $self->save($key, join $separator, shuffle @vals);}
+    $self->save_once($key, sub {join $separator, shuffle @vals});}
 
 sub get_condition
 # Pick a new condition for this subject from the conditions
