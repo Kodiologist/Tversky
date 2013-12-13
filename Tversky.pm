@@ -538,7 +538,7 @@ sub text_entry_page
                 html => sprintf('<div class="text_entry">%s%s</div>',
                   $options{multiline}
                     ? '<textarea class="text_entry" name="text_entry" rows="3" cols="30"></textarea>'
-                    : '<input type="text" class="text_entry" name="text_entry">',
+                    : "<input type='text' maxlength='$options{max_chars}' class='text_entry' name='text_entry'>",
                   defined $options{hint}
                     ? sprintf '<div class="hint">%s</div>', $options{hint}
                     : ''),
@@ -677,8 +677,9 @@ sub multiple_choice_page
                         sprintf('<div class="button"><button name="multiple_choice" value="%s" type="submit">%s</button></div>',
                             htmlsafe($value), htmlsafe($label)),
                         sprintf('<div class="body">%s</div>', is_FREE_RESPONSE($body)
-                          ? sprintf('<input type="text" class="text_entry" name="multiple_choice_fr.%s" value="">',
-                              htmlsafe($value))
+                          ? sprintf('<input type="text" maxlength="%s" class="text_entry" name="multiple_choice_fr.%s" value="">',
+                                $multiple_choice_fr_max_chars,
+                                htmlsafe($value))
                           : $body)}
                 @choices),
             proc => sub
