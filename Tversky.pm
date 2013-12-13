@@ -70,6 +70,8 @@ use constant HTTP_CANTDOTHAT => '422 Unprocessable Entity';
 use constant HTTP_FORBIDDEN => '403 Forbidden';
 use constant HTTP_MYFAULT => '500 Internal Server Error';
 
+use constant FR_MAX_CHARS => 1024;
+
 my $sql_abstract = new SQL::Abstract;
 
 our %pp;
@@ -656,8 +658,6 @@ sub yesno_page
             proc => sub 
                {$_ eq 'Yes' || $_ eq 'No' ? $_ : undef;}}]);}
 
-my $multiple_choice_fr_max_chars = 1024;
-
 sub multiple_choice_page
    {my ($self, $key, $content, @choices) = @_;
     @choices = map2
@@ -676,7 +676,7 @@ sub multiple_choice_page
                             htmlsafe($value), htmlsafe($label)),
                         sprintf('<div class="body">%s</div>', is_FREE_RESPONSE($body)
                           ? sprintf('<input type="text" maxlength="%s" class="text_entry" name="multiple_choice_fr.%s" value="">',
-                                $multiple_choice_fr_max_chars,
+                                FR_MAX_CHARS,
                                 htmlsafe($value))
                           : $body)}
                 @choices),
@@ -691,7 +691,7 @@ sub multiple_choice_page
                     $input =~ s/\A\s+//;
                     $input =~ s/\s+\z//;
                     $input eq '' and return undef;
-                    $input = substr $input, 0, $multiple_choice_fr_max_chars;
+                    $input = substr $input, 0, FR_MAX_CHARS;
                     return "[FR] $input";}
                 undef;}}]);}
 
@@ -753,13 +753,30 @@ sub checkboxes_page
         fields =>
            [(map2
                {my ($value, $body) = @_;
+                my $free_response = '';
+                if (ref($body) and is_FREE_RESPONSE($body->[1]))
+                   {$body = $body->[0];
+                    $free_response = 1;}
                 {name => "checkbox.$value",
                     k => "$key.$value",
                     optional => 1,
-                    html => sprintf('<div class="row"><label>%s%s</label></div>',
+                    html => sprintf('<div class="row"><label>%s%s</label>%s</div>',
                         "<input type='checkbox' name='checkbox.$value'>",
-                        $body),
-                    proc => sub {$_ ? 1 : 0}}}
+                        $body,
+                        $free_response &&
+                            sprintf('<input type="text" maxlength="%s" class="text_entry" name="checkbox_fr.%s" value="">',
+                                FR_MAX_CHARS,
+                                htmlsafe($value))),
+                    proc => sub
+                       {$_ or return '';
+                        $free_response or return 1;
+                        my $input = $pp{"checkbox_fr.$value"};
+                        defined $input or return undef;
+                        $input =~ s/\A\s+//;
+                        $input =~ s/\s+\z//;
+                        $input eq '' and return undef;
+                        $input = substr $input, 0, FR_MAX_CHARS;
+                        return $input;}}}
                 @choices),
             {name => 'checkboxes_page_submit_button',
                 html => '<p><button class="next_button" name="checkboxes_page_submit_button" value="submit" type="submit">OK</button></p>',
