@@ -747,6 +747,26 @@ sub image_button_page
                 html => '',
                 proc => \&image_button_page_proc}]);}
 
+sub checkboxes_page
+   {my ($self, $key, $content, @choices) = @_;
+    $self->page(key => $key,
+        content => $content,
+        fields_wrapper => '<div class="checkboxes_box">%s</div>',
+        fields =>
+           [(map2
+               {my ($value, $body) = @_;
+                {name => "checkbox.$value",
+                    k => "$key.$value",
+                    optional => 1,
+                    html => sprintf('<div class="row"><label>%s%s</label></div>',
+                        "<input type='checkbox' name='checkbox.$value'>",
+                        $body),
+                    proc => sub {$_ ? 1 : 0}}}
+                @choices),
+            {name => 'checkboxes_page_submit_button',
+                html => '<p><button class="next_button" name="checkboxes_page_submit_button" value="submit" type="submit">OK</button></p>',
+                proc => sub { $_ eq 'submit' or undef }}]);}
+
 sub completion_page
    {my $self = shift;
     unless (defined $self->{completion_key})
@@ -883,7 +903,10 @@ sub double_dipped_page
 
 sub page
    {my $self = shift;
-    my %h = (key => undef, content => undef, fields => [], @_);
+    my %h =
+       (key => undef, content => undef,
+        fields_wrapper => '%s', fields => [],
+        @_);
     my $key = $h{key};
 
     if (defined $key)
@@ -903,7 +926,7 @@ sub page
            {my %to_save;
             local *pp = $self->{post_params};
             foreach my $f (@{$h{fields}})
-               {exists $pp{$f->{name}} or last VALIDATE;
+               {$f->{optional} or exists $pp{$f->{name}} or last VALIDATE;
                 local $_ = $pp{$f->{name}};
                 my $v = $f->{proc}->();
                 defined $v or last VALIDATE;
@@ -923,7 +946,8 @@ sub page
           ? sprintf('<div><input type="hidden" name="key" value="%s"></div>',
                 htmlsafe $key)
           : (),
-        map {$_->{html}} @{$h{fields}});
+        sprintf $h{fields_wrapper}, join '',
+            map {$_->{html}} @{$h{fields}});
     $self->quit;}
 
 sub form
