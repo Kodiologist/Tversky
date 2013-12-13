@@ -899,7 +899,7 @@ sub page
         VALIDATE: {
         if ($self->{post_params} and
                 exists $self->{post_params}{key} and
-                $self->{post_params}{key} eq htmlsafe($key))
+                $self->{post_params}{key} eq $key)
            {my %to_save;
             local *pp = $self->{post_params};
             foreach my $f (@{$h{fields}})
