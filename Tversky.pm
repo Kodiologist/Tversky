@@ -747,8 +747,20 @@ sub image_button_page
 
 sub checkboxes_page
    {my ($self, $key, $content, @choices) = @_;
+    my $at_least = 0;
+    for (my $i = 0 ; $i < @choices ;)
+       {if ($choices[$i] eq 'AT_LEAST')
+           {$at_least = $choices[$i + 1];
+            splice @choices, $i, 2;}
+        else
+           {$i += 2;}}
     $self->page(key => $key,
         content => $content,
+        check => sub
+           {my $count = 0;
+            $_ and ++$count
+                foreach @pp{map2 {"checkbox.$_[0]"} @choices};
+            $count >= $at_least},
         fields_wrapper => '<div class="checkboxes_box">%s</div>',
         fields =>
            [(map2
@@ -921,6 +933,10 @@ sub page
     my %h =
        (key => undef, content => undef,
         fields_wrapper => '%s', fields => [],
+        check => sub {1},
+          # This sub gets an extra chance to cause validation
+          # to fail (by returning a false value) after the page
+          # has otherwise been validated.
         @_);
     my $key = $h{key};
 
@@ -946,6 +962,7 @@ sub page
                 my $v = $f->{proc}->();
                 defined $v or last VALIDATE;
                 exists $f->{k} and $to_save{$f->{k}} = $v;}
+            $h{check}->() or last VALIDATE;
             $self->transaction(sub
                {$self->save($_, $to_save{$_}) foreach keys %to_save;
                 $self->now_done($key);});
