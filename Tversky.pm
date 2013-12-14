@@ -51,8 +51,8 @@ sub shuffle
         $k == $n or @a[$k, $n] = @a[$n, $k];}
     return @a;}
 
-use constant FREE_RESPONSE => [];
-sub is_FREE_RESPONSE {ref($_[0]) and ref($_[0]) eq 'ARRAY' and @{$_[0]} == 0}
+use constant FREE_RESPONSE => bless [], __PACKAGE__ . '::FREE_RESPONSE';
+sub is_FREE_RESPONSE ($) {ref($_[0]) and ref($_[0]) eq __PACKAGE__ . '::FREE_RESPONSE'}
 
 $EXPORT_TAGS{table_names} = [qw(SUBJECTS USER TIMING MTURK CONDITIONS)];
 use constant SUBJECTS => 'Subjects';
