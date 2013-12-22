@@ -669,16 +669,16 @@ sub multiple_choice_page
             k => $key,
             html => sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
                 map2
-                   {my ($value, $label) = @{shift()};
+                   {my ($value, $label) = map {htmlsafe $_} @{shift()};
                     my $body = shift;
                     sprintf '<div class="row">%s%s</div>',
-                        sprintf('<div class="button"><button name="multiple_choice" value="%s" type="submit">%s</button></div>',
-                            htmlsafe($value), htmlsafe($label)),
-                        sprintf('<div class="body">%s</div>', is_FREE_RESPONSE($body)
-                          ? sprintf('<input type="text" maxlength="%s" class="text_entry" name="multiple_choice_fr.%s" value="">',
-                                FR_MAX_CHARS,
-                                htmlsafe($value))
-                          : $body)}
+                        "<div class='button'><button name='multiple_choice' value='$value' id='multiple_choice.$value' type='submit'>$label</button></div>",
+                        defined $body && $body ne '' &&
+                           (is_FREE_RESPONSE($body)
+                              ? sprintf('<input type="text" maxlength="%s" class="body text_entry" name="multiple_choice_fr.%s" value="">',
+                                  FR_MAX_CHARS,
+                                  $value)
+                              : "<label class='body' for='multiple_choice.$value'>$body</label>")}
                 @choices),
             proc => sub
                {foreach my $i (0 .. int(@choices/2) - 1)
