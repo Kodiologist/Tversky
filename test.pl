@@ -30,7 +30,7 @@ is_approx len('5 ft, 3 inches'), 1.6002;
 is_approx len('5 ft. 3 in.'), 1.6002;
 is_approx len('5 feet and 6 in + 1 cm'), 1.6864;
 
-is len('3feet.3inches'), undef, 'reject ambiguous input';
+is len('3ft.3in.'), undef, 'reject ambiguous input';
 
 sub mass
    {Tversky::measurement_entry_proc($_[0], \&Tversky::mass_reader)}
