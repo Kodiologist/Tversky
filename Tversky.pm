@@ -456,7 +456,7 @@ sub get_condition
 # Pick a new condition for this subject from the conditions
 # table, or, if one has already been assigned, return that.
    {my ($self, $key) = @_;
-    $self->save_once($key, sub
+    $self->save_once_atomic($key, sub
       # Claim the least unused condition number (cn) for this key.
        {$self->modify(CONDITIONS,
            {cn => do
@@ -725,13 +725,14 @@ sub image_button_page
       # moving the mouse.
        {if (not $self->existsu("$key.bump"))
            {$self->save_once('TVERSKY.prev_bump', sub {'Yes'});
-            my $bump_now = $self->getu('TVERSKY.prev_bump') eq 'No';
-            $self->save("$key.bump", $bump_now
-              ? $options{bump}
-              : '0');
-            $self->save('TVERSKY.prev_bump', $bump_now
-              ? 'Yes'
-              : 'No');}
+            $self->transaction(sub
+               {my $bump_now = $self->getu('TVERSKY.prev_bump') eq 'No';
+                $self->save("$key.bump", $bump_now
+                  ? $options{bump}
+                  : '0');
+                $self->save('TVERSKY.prev_bump', $bump_now
+                  ? 'Yes'
+                  : 'No');});}
         $options{bump} = $self->getu("$key.bump");}
     $self->page(key => $key,
         content => $content,
@@ -798,9 +799,17 @@ sub completion_page
    {my $self = shift;
     unless (defined $self->{completion_key})
        {$self->{completion_key} = randint;
-        $self->modify(SUBJECTS, {sn => $self->{sn}},
+        $self->modify(SUBJECTS,
+           {sn => $self->{sn},
+                completion_key => undef},
            {completion_key => $self->{completion_key},
-            completed_t => time});}
+                completed_t => time});
+        # If the ->modify call did nothing because a completion
+        # key was added after the check, be sure to get the real
+        # completion key.
+        $self->{completion_key} = $self->getitem(SUBJECTS,
+           'completion_key',
+           {sn => $self->{sn}});}
     print $self->{experiment_complete};
     if ($self->{mturk})
       # Create a HIT-submission button.
@@ -816,8 +825,7 @@ sub completion_page
 
 sub loop
    {my ($self, $key, $f) = @_;
-    $self->existsu($key)
-        or $self->save($key, 0);
+    $self->save_once($key, sub {0});
     local $_ = $self->getu($key);
     /\ADONE / and return;
     foreach my $UNUSED (1, 2)
@@ -964,7 +972,13 @@ sub page
                 exists $f->{k} and $to_save{$f->{k}} = $v;}
             $h{check}->() or last VALIDATE;
             $self->transaction(sub
-               {$self->save($_, $to_save{$_}) foreach keys %to_save;
+               {# Now that we're in a transaction, check again
+                # that this task hasn't already been completed.
+                # Otherwise a race condition could make us
+                # overwrite the original responses.
+                $self->cache_tables;
+                $self->begin($key) or return;
+                $self->save($_, $to_save{$_}) foreach keys %to_save;
                 $self->now_done($key);});
             # Delete $self->{post_params} so responses to this
             # task aren't mistaken for responses to another task.

@@ -2,7 +2,7 @@ Tversky is a Perl module for running psychology experiments on the Web, especial
 
 You should take the absence of documentation as a hint that I'm not making any guarantees about stability. I wrote this thing for my own use. But see `Builder`_ for an example task.
 
-As for security, Tversky should resist SQL-injection attacks and cross-site request forgery, but I haven't thought about race conditions much. You should run your CGI script in taint mode, of course.
+As for security, Tversky should resist SQL-injection attacks and cross-site request forgery, and I've tried to minimize race conditions. You should run your CGI script in taint mode, of course.
 
 The ``rserve_call`` method requires the ``call`` method of Rserve::Connection that I defined in `my fork of Rserve-perl`_.
 
