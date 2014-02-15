@@ -809,7 +809,7 @@ sub completion_page
         # completion key.
         $self->{completion_key} = $self->getitem(SUBJECTS,
            'completion_key',
-           {sn => $self->{sn}});}
+           sn => $self->{sn});}
     print $self->{experiment_complete};
     if ($self->{mturk})
       # Create a HIT-submission button.
