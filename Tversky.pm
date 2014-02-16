@@ -76,6 +76,9 @@ my $sql_abstract = new SQL::Abstract;
 
 our %pp;
   # This gets bound to all post parameters inside 'proc' subs.
+our %to_save;
+  # This is bound such that 'proc' subs can assign to it to save
+  # extra data.
 
 sub in
    {my $item = shift;
@@ -525,7 +528,7 @@ sub text_entry_page
    {my ($self, $key, $content) = splice @_, 0, 3;
     my %options =
        (multiline => 0, max_chars => 256,
-        trim => 1, accept_blank => 0,
+        trim => 1, accept_blank => 0, save_raw => 0,
         hint => undef, proc => undef,
         @_);
     # Note: hint, if provided, should be raw HTML, not
@@ -547,10 +550,13 @@ sub text_entry_page
                        {s/\A\s+//;
                         s/\s+\z//;}
                     $options{accept_blank} or /\S/ or return;
+                    $_ = substr $_, 0, $options{max_chars};
+                    $options{save_raw}
+                        and $to_save{"$key.raw"} = $_;
                     if ($options{proc})
                        {$_ = $options{proc}->();
                         defined or return;}
-                    substr $_, 0, $options{max_chars};}},
+                    $_;}},
            {name => 'text_entry_submit_button',
                 html => '<p><button class="next_button" name="text_entry_submit_button" value="submit" type="submit">OK</button></p>',
                 proc => sub { $_ eq 'submit' or undef }}]);}
@@ -592,18 +598,20 @@ sub dollars_entry_page
               : undef});}
 
 sub length_entry_page
-# The length is stored in meters.
+# The length is stored in meters. The raw input is also saved.
    {my ($self, $key, $content) = @_;
     $self->text_entry_page($key, $content,
         hint => 'Enter a length, including a unit (such as "m" or "ft"; multi-unit sums like "1 ft 3 in" are allowed).',
-        proc => sub {measurement_entry_proc($_, \&length_reader)});}
+        proc => sub {measurement_entry_proc($_, \&length_reader)},
+        save_raw => 1);}
 
 sub weight_entry_page
-# The weight is stored in kilograms.
+# The weight is stored in kilograms. The raw input is also saved.
    {my ($self, $key, $content) = @_;
     $self->text_entry_page($key, $content,
         hint => 'Enter a weight, including a unit (such as "pounds" or "kg").',
-        proc => sub {measurement_entry_proc($_, \&mass_reader)});}
+        proc => sub {measurement_entry_proc($_, \&mass_reader)},
+        save_raw => 1);}
 
 sub discrete_rating_page
    {my ($self, $key, $content) = splice @_, 0, 3;
@@ -962,7 +970,7 @@ sub page
         if ($self->{post_params} and
                 exists $self->{post_params}{key} and
                 $self->{post_params}{key} eq $key)
-           {my %to_save;
+           {local %to_save;
             local *pp = $self->{post_params};
             foreach my $f (@{$h{fields}})
                {$f->{optional} or exists $pp{$f->{name}} or last VALIDATE;
