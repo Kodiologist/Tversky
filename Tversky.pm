@@ -218,7 +218,8 @@ sub init
     $o->{db} = DBIx::Simple->connect("dbi:SQLite:dbname=$o->{database_path}", '', '',
        {RaiseError => 1,
         sqlite_unicode => 1,
-        sqlite_see_if_its_a_number => 1});
+        sqlite_see_if_its_a_number => 1,
+        sqlite_use_immediate_transaction => 1});
     $o->sql('pragma foreign_keys = on');
 
     if ($ENV{REQUEST_METHOD} eq 'POST')
