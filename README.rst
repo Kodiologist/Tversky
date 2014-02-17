@@ -20,6 +20,12 @@ Also included in this repository are:
 ``test.pl``
     A test suite. Currently, it only tests Tversky's internal functions for parsing and doing arithmetic with units of measurement.
 
+``test-sqlite-sleeptimes.pl``
+    A program that can be used to check if `SQLite sleeps in whole-second increments`__, in which case Tversky may handle multiple simultaneous subjects badly. Pass it arguments like 2, 2.1, and 2.2 and watch the relationship between the parent's sleep time and the child's wait time.
+
+..
+__ http://beets.radbox.org/blog/sqlite-nightmare.html
+
 See also `Kodi.R`_ for an R function ``unpack.tversky`` with which to import a Tversky database as a list of data frames.
 
 Tversky is similar to but distinct from `SchizoidPy`_, which is a Python module to run psychology experiments locally. Tversky and SchizoidPy have different APIs because of the fundamental differences between web programming and application programming (which I, unlike a lot of people these days, am hardly eager to smooth over), but I've tried not to make them needlessly inconsistent.
