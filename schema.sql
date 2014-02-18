@@ -1,3 +1,5 @@
+pragma journal_mode = wal;
+
 create table Subjects
    (sn                              integer primary key,
     experimenter      text,
