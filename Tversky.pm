@@ -161,6 +161,10 @@ sub new
 
     my %h =
         (mturk => 0,
+         save_ip_and_wid => 1,
+           # Turn this off to avoid storing IP addresses or
+           # Worker IDs in the database, for the sake of subject
+           # privacy. N.B. this prevents double-dipping detection.
          assume_consent => 0, # Turn it on for testing.
          here_url => undef,
          cookie_lifespan => 12*60*60, # 12 hours
@@ -319,7 +323,7 @@ sub init
                     experimenter => $experimenter,
                     cookie_id => $cid,
                     cookie_expires_t => $cookie_expires_t,
-                    ip => $ENV{REMOTE_ADDR},
+                    ip => $o->{save_ip_and_wid} ? $ENV{REMOTE_ADDR} : '[not collected]',
                     consented_t => $o->{assume_consent}
                       ? 'assumed'
                       : time ,
@@ -328,7 +332,7 @@ sub init
                 $o->{sn} = $s{sn};
                 $o->{mturk} and $o->insert(MTURK,
                     sn => $s{sn},
-                    workerid => $p{workerId},
+                    workerid => $o->{save_ip_and_wid} ? $p{workerId} : '[not collected]',
                     hitid => $p{hitId},
                     assignmentid => $p{assignmentId},
                     submit_to => $p{turkSubmitTo},
@@ -348,7 +352,7 @@ sub init
                 '<input type="text" class="consent_statement" name="consent_statement" value="">',
                 '<button type="submit" name="consent_button" value="submitted">OK</button>',
                 !$o->{mturk} ? '' : hidden_inputs
-                   (workerId => $p{workerId},
+                   (workerId => $o->{save_ip_and_wid} ? $p{workerId} : '[not collected]',
                     hitId => $p{hitId},
                     assignmentId => $p{assignmentId},
                     turkSubmitTo => $p{turkSubmitTo}));
