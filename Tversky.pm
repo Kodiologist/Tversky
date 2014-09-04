@@ -173,6 +173,10 @@ sub new
          password_hash => undef,
          password_salt => undef,
 
+         sn_param_without_password => 0,
+           # If this is on, the subject number can (and in fact
+           # must) be set directly with the 'sn' CGI parameter.
+
          database_path => undef,
 
          consent_path => undef,
@@ -197,7 +201,9 @@ sub new
        {$o->{password_salt}
             or die 'No salt defined';
         $o->{assume_consent}
-            or die 'password_hash without assume_consent is not implemented';}
+            or die 'password_hash without assume_consent is not implemented';
+        $o->{sn_param_without_password}
+            and die q(Setting both password_hash and sn_param_without_password doesn't make sense);}
 
     $o;}
 
@@ -261,6 +267,19 @@ sub init
         $chosen_sn = $p{sn};
         $experimenter = $p{experimenter};}
 
+    if ($o->{sn_param_without_password} and exists $p{sn})
+       {BLOCK:
+           {my $msg =
+                $p{sn} !~ /\A\d+\z/
+              ? 'The given subject number is not an integer.'
+              : $o->count(SUBJECTS, sn => $p{sn})
+              ? 'That subject number is already taken.'
+              : last BLOCK;
+            $o->ensure_header(HTTP_CANTDOTHAT);
+            print '<p><strong>Error:</strong> ', $msg, '</p>';
+            $o->quit;}
+        $chosen_sn = $p{sn};}
+
     my $cookie;
        {my %h = CGI::Cookie->fetch;
         %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
@@ -293,9 +312,14 @@ sub init
            {$o->ensure_header;
             $o->double_dipped_page;}
 
-        elsif (defined $o->{password_hash} and not defined $chosen_sn)
+        elsif (!defined $chosen_sn and defined $o->{password_hash})
            {$o->ensure_header(HTTP_FORBIDDEN);
             print '<p>Access denied.</p>';
+            $o->quit;}
+
+        elsif (!defined $chosen_sn and $o->{sn_param_without_password})
+           {$o->ensure_header(HTTP_CANTDOTHAT);
+            print '<p><strong>Error:</strong> A subject number must be chosen explicitly.</p>';
             $o->quit;}
 
         elsif ($o->{assume_consent}
