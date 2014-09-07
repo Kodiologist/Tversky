@@ -275,7 +275,9 @@ sub init
        {%s = $o->getrow(SUBJECTS, cookie_id => $cookie->value);
         $o->{sn} = $s{sn};}
 
-    if ($o->{sn_param_without_password} and exists $p{sn}
+    if ($o->{sn_param_without_password}
+            and $ENV{REQUEST_METHOD} eq 'GET'
+            and exists $p{sn}
             and !exists $s{sn} || $s{sn} ne $p{sn})
               # Subjects won't realize they need to clear
               # "?sn=..." from the URL to use their existing
