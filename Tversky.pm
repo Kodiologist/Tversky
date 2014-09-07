@@ -267,7 +267,20 @@ sub init
         $chosen_sn = $p{sn};
         $experimenter = $p{experimenter};}
 
-    if ($o->{sn_param_without_password} and exists $p{sn})
+    my $cookie;
+       {my %h = CGI::Cookie->fetch;
+        %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
+    my %s;
+    if (defined $cookie)
+       {%s = $o->getrow(SUBJECTS, cookie_id => $cookie->value);
+        $o->{sn} = $s{sn};}
+
+    if ($o->{sn_param_without_password} and exists $p{sn}
+            and !exists $s{sn} || $s{sn} ne $p{sn})
+              # Subjects won't realize they need to clear
+              # "?sn=..." from the URL to use their existing
+              # cookie, so ignore the parameter if it matches
+              # the subject number in the cookie.
        {BLOCK:
            {my $msg =
                 $p{sn} !~ /\A\d+\z/
@@ -280,13 +293,6 @@ sub init
             $o->quit;}
         $chosen_sn = $p{sn};}
 
-    my $cookie;
-       {my %h = CGI::Cookie->fetch;
-        %h and $cookie = $h{'Tversky_ID_' . $o->{cookie_name_suffix}};}
-    my %s;
-    if (defined $cookie)
-       {%s = $o->getrow(SUBJECTS, cookie_id => $cookie->value);
-        $o->{sn} = $s{sn};}
     unless (defined $cookie
             and !defined $chosen_sn
             and %s and time <= $s{cookie_expires_t}
