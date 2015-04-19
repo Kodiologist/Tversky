@@ -705,11 +705,10 @@ sub yesno_page
 
 sub multiple_choice_page
    {my ($self, $key, $content) = splice @_, 0, 3;
-    my $proc;
-    if (!ref $_[0] and $_[0] eq 'PROC')
-       # A custom PROC can be useful if you're munging the form
-       # with JavaScript.
-       {(undef, $proc) = splice @_, 0, 2;}
+    my %page_opts;
+    if (!ref $_[0] and $_[0] eq 'PAGE')
+       {shift;
+        %page_opts = %{shift()};}
     my @choices = map2
         {ref $_[0] ? ($_[0], $_[1]) : ([$_[0], $_[0]], $_[1])}
         @_;
@@ -730,7 +729,7 @@ sub multiple_choice_page
                                   $value)
                               : "<label class='body' for='multiple_choice.$value'>$body</label>")}
                 @choices),
-            proc => $proc || sub
+            proc => $page_opts{proc} || sub
                {foreach my $i (0 .. int(@choices/2) - 1)
                    {my $value = $choices[2*$i][0];
                     my $body = $choices[2*$i + 1];
@@ -743,7 +742,8 @@ sub multiple_choice_page
                     $input eq '' and return undef;
                     $input = substr $input, 0, FR_MAX_CHARS;
                     return "[FR] $input";}
-                undef;}}]);}
+                undef;}}],
+        %page_opts);}
 
 my @generic_labels = ('A' .. 'Z');
 
