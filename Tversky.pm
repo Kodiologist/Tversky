@@ -554,12 +554,13 @@ sub prompt_new_window_page
     $self->quit;}
 
 sub okay_page
-   {my ($self, $key, $content) = @_;
+   {my ($self, $key, $content) = splice @_, 0, 3;
     $self->page(key => $key,
         content => $content,
         fields => [{name => 'next_button',
             html => '<p><button class="next_button" name="next_button" value="next" type="submit">Next</button></p>',
-            proc => sub { $_ eq 'next' or undef }}]);}
+            proc => sub { $_ eq 'next' or undef }}],
+        @_);}
 
 sub text_entry_page
    {my ($self, $key, $content) = splice @_, 0, 3;
