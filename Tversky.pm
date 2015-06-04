@@ -711,32 +711,32 @@ sub multiple_choice_page
        {shift;
         %page_opts = %{shift()};}
     my @choices = map2
-        {ref $_[0] ? ($_[0], $_[1]) : ([$_[0], $_[0]], $_[1])}
+        {ref $_[0]
+          ? {value => $_[0][0], label => $_[0][1], body => $_[1]}
+          : {value => $_[0], label => $_[0], body => $_[1]}}
         @_;
     $self->page(key => $key,
         content => $content,
         fields => [{name => 'multiple_choice',
             k => $key,
             html => sprintf('<div class="multiple_choice_box">%s</div>', join "\n",
-                map2
-                   {my ($value, $label) = map {htmlsafe $_} @{shift()};
-                    my $body = shift;
+                map
+                   {my %h = %$_;
+                    $h{$_} = htmlsafe $h{$_} foreach ('value', 'label');
                     sprintf '<div class="row">%s%s</div>',
-                        "<div class='button'><button name='multiple_choice' value='$value' id='multiple_choice.$value' type='submit'>$label</button></div>",
-                        defined $body && $body ne '' &&
-                           (is_FREE_RESPONSE($body)
+                        "<div class='button'><button name='multiple_choice' value='$h{value}' id='multiple_choice.$h{value}' type='submit'>$h{label}</button></div>",
+                        defined $h{body} && $h{body} ne '' &&
+                           (is_FREE_RESPONSE($h{body})
                               ? sprintf('<input type="text" maxlength="%s" class="body text_entry" name="multiple_choice_fr.%s" value="">',
                                   FR_MAX_CHARS,
-                                  $value)
-                              : "<label class='body' for='multiple_choice.$value'>$body</label>")}
+                                  $h{value})
+                              : "<label class='body' for='multiple_choice.$h{value}'>$h{body}</label>")}
                 @choices),
             proc => $page_opts{proc} || sub
-               {foreach my $i (0 .. int(@choices/2) - 1)
-                   {my $value = $choices[2*$i][0];
-                    my $body = $choices[2*$i + 1];
-                    $_ eq $value or next;
-                    is_FREE_RESPONSE($body) or return $value;
-                    my $input = $pp{"multiple_choice_fr.$value"};
+               {foreach my $c (@choices)
+                   {$_ eq $c->{value} or next;
+                    is_FREE_RESPONSE($c->{body}) or return $c->{value};
+                    my $input = $pp{'multiple_choice_fr.' . $c->{value}};
                     defined $input or return undef;
                     $input =~ s/\A\s+//;
                     $input =~ s/\s+\z//;
