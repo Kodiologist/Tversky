@@ -18,7 +18,7 @@ use Digest::SHA 'sha256_base64';
 # Public subroutines
 # --------------------------------------------------
 
-our @EXPORT_OK = qw(cat htmlsafe randint randelm shuffle FREE_RESPONSE);
+our @EXPORT_OK = qw(cat htmlsafe randint randelm shuffle FREE_RESPONSE DISABLED);
 
 sub cat
    {join '', @_}
@@ -53,6 +53,8 @@ sub shuffle
 
 use constant FREE_RESPONSE => bless [], __PACKAGE__ . '::FREE_RESPONSE';
 sub is_FREE_RESPONSE ($) {ref($_[0]) and ref($_[0]) eq __PACKAGE__ . '::FREE_RESPONSE'}
+
+use constant DISABLED => 1;
 
 $EXPORT_TAGS{table_names} = [qw(SUBJECTS USER TIMING MTURK CONDITIONS)];
 use constant SUBJECTS => 'Subjects';
@@ -554,13 +556,17 @@ sub prompt_new_window_page
     $self->quit;}
 
 sub okay_page
-   {my ($self, $key, $content) = splice @_, 0, 3;
+   {my ($self, $key, $content, %options) = @_;
+    my $disabled = delete $options{disabled} ? ' disabled' : '';
+    my $text = delete $options{button_text};
+    defined $text and $text ne ''
+       or $text = 'Next';
     $self->page(key => $key,
         content => $content,
         fields => [{name => 'next_button',
-            html => '<p><button class="next_button" name="next_button" value="next" type="submit">Next</button></p>',
+            html => "<p><button class='next_button' name='next_button' value='next' type='submit'$disabled>$text</button></p>",
             proc => sub { $_ eq 'next' or undef }}],
-        @_);}
+        %options);}
 
 sub text_entry_page
    {my ($self, $key, $content) = splice @_, 0, 3;
@@ -712,8 +718,10 @@ sub multiple_choice_page
         %page_opts = %{shift()};}
     my @choices = map2
         {ref $_[0]
-          ? {value => $_[0][0], label => $_[0][1], body => $_[1]}
-          : {value => $_[0], label => $_[0], body => $_[1]}}
+          ? {value => $_[0][0], label => $_[0][1], disabled => $_[0][2],
+              body => $_[1]}
+          : {value => $_[0], label => $_[0], disabled => 0,
+              body => $_[1]}}
         @_;
     $self->page(key => $key,
         content => $content,
@@ -723,8 +731,9 @@ sub multiple_choice_page
                 map
                    {my %h = %$_;
                     $h{$_} = htmlsafe $h{$_} foreach ('value', 'label');
+                    my $disabled = $h{disabled} ? ' disabled' : '';
                     sprintf '<div class="row">%s%s</div>',
-                        "<div class='button'><button name='multiple_choice' value='$h{value}' id='multiple_choice.$h{value}' type='submit'>$h{label}</button></div>",
+                        "<div class='button'><button name='multiple_choice' value='$h{value}' id='multiple_choice.$h{value}' type='submit'$disabled>$h{label}</button></div>",
                         defined $h{body} && $h{body} ne '' &&
                            (is_FREE_RESPONSE($h{body})
                               ? sprintf('<input type="text" maxlength="%s" class="body text_entry" name="multiple_choice_fr.%s" value="">',
