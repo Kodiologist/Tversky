@@ -220,8 +220,10 @@ sub run
     defined $@ or $@ = 'Exited "run" with undefined $@';
     $@ eq '' and $@ = 'Exited "run" with $@ set to the null string';
     warn $@;
-    printf '<p>Error:</p><pre>%s</pre><p>Please report this.</p>',
-        htmlsafe $@;
+    printf '<p>Error:</p><pre>%s</pre><p>Please report this.%s</p>',
+        htmlsafe($@),
+        !$self->{mturk} ? '' :
+            ' If you have invested a significant amount of time in this HIT but are unable to complete it due to errors, ask us about getting compensated for your time.';
     $self->quit;}
 
 sub init
